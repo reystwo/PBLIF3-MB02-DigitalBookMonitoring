@@ -3,6 +3,7 @@
 // =============================================================
 import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
+import 'package:digital_book_connect/screens/auth/login_page.dart';
 
 // --- HALAMAN WELCOME ---
 class HomePage extends StatelessWidget {
@@ -52,7 +53,13 @@ class HomePage extends StatelessWidget {
                   const _FiturRow(),
                   const SizedBox(height: 32),
                   _TombolMulai(
-                    onPressed: () => _info(context, 'Menuju halaman berikutnya...'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   _LinkPelajari(
