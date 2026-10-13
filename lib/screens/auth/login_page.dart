@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
+import 'package:digital_book_connect/screens/admin/admin_main_page.dart';
+import 'package:digital_book_connect/screens/guru/guru_main_page.dart';
+import 'package:digital_book_connect/screens/orang_tua/orang_tua_main_page.dart';
 
 enum UserRole {
   guru('Guru', Icons.school_outlined),
@@ -35,12 +38,15 @@ class _LoginPageState extends State<LoginPage> {
 
   void _handleLogin() {
     if (_formKey.currentState?.validate() ?? false) {
-      final username = _usernameController.text.trim();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Login sebagai ${_selectedRole.label} ($username)'),
-          backgroundColor: AppColors.primary,
-        ),
+      // Sementara tanpa autentikasi: langsung ke dashboard sesuai role
+      final Widget dashboard = switch (_selectedRole) {
+        UserRole.guru => const GuruMainPage(),
+        UserRole.orangTua => const OrangTuaMainPage(),
+        UserRole.admin => const AdminMainPage(),
+      };
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => dashboard),
+        (_) => false,
       );
     }
   }
