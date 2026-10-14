@@ -6,6 +6,7 @@ import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/data/dummy_data.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
 import 'package:digital_book_connect/screens/catatan/tambah_catatan_page.dart';
+import 'package:digital_book_connect/services/app_repository.dart';
 
 class DaftarSiswaPage extends StatefulWidget {
   final String judul;
@@ -21,9 +22,35 @@ class DaftarSiswaPage extends StatefulWidget {
 class _DaftarSiswaPageState extends State<DaftarSiswaPage> {
   String? _kelasDipilih; // null = semua kelas
   String _kataKunci = '';
+  List<String> _listKelas = daftarKelas;
+  List<Siswa> _listSiswa = daftarSiswa;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    try {
+      final kelasRes = await AppRepository.getKelas();
+      final siswaRes = await AppRepository.getSiswa();
+
+      if (mounted) {
+        setState(() {
+          if (kelasRes.isSuccess && kelasRes.data != null && kelasRes.data!.isNotEmpty) {
+            _listKelas = kelasRes.data!.map((k) => k.namaKelas).toList();
+          }
+          if (siswaRes.isSuccess && siswaRes.data != null && siswaRes.data!.isNotEmpty) {
+            _listSiswa = siswaRes.data!.map((s) => Siswa.fromModel(s)).toList();
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   List<Siswa> get _hasil {
-    return daftarSiswa.where((s) {
+    return _listSiswa.where((s) {
       final cocokKelas = _kelasDipilih == null || s.kelas == _kelasDipilih;
       final cocokNama = s.nama.toLowerCase().contains(_kataKunci.toLowerCase());
       return cocokKelas && cocokNama;
@@ -35,7 +62,9 @@ class _DaftarSiswaPageState extends State<DaftarSiswaPage> {
     final hasil = _hasil;
     return Scaffold(
       appBar: JudulAppBar(judul: widget.judul, onBack: widget.onBack),
-      body: ListView(
+      body: RefreshIndicator(
+        onRefresh: _fetchData,
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           // Kolom pencarian
@@ -71,7 +100,7 @@ class _DaftarSiswaPageState extends State<DaftarSiswaPage> {
             child: Row(
               children: [
                 _chip('Semua Kelas', null),
-                for (final k in daftarKelas) _chip('Kelas $k', k),
+                for (final k in _listKelas) _chip('Kelas $k', k),
               ],
             ),
           ),
@@ -97,6 +126,7 @@ class _DaftarSiswaPageState extends State<DaftarSiswaPage> {
               ],
             ),
         ],
+      ),
       ),
     );
   }

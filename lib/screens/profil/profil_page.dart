@@ -5,13 +5,41 @@ import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
 import 'package:digital_book_connect/screens/home/home_page.dart';
+import 'package:digital_book_connect/services/app_repository.dart';
+import 'package:digital_book_connect/services/session_manager.dart';
 
-class ProfilPage extends StatelessWidget {
+class ProfilPage extends StatefulWidget {
   final String nama;
   final String peran;
   final VoidCallback? onBack;
 
   const ProfilPage({super.key, required this.nama, required this.peran, this.onBack});
+
+  @override
+  State<ProfilPage> createState() => _ProfilPageState();
+}
+
+class _ProfilPageState extends State<ProfilPage> {
+  String _nama = '';
+  String _peran = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _nama = widget.nama;
+    _peran = widget.peran;
+    _loadUserSession();
+  }
+
+  Future<void> _loadUserSession() async {
+    final user = await SessionManager.getUser();
+    if (user != null && mounted) {
+      setState(() {
+        _nama = user.nama.isNotEmpty ? user.nama : widget.nama;
+        _peran = user.peranLabel.isNotEmpty ? user.peranLabel : widget.peran;
+      });
+    }
+  }
 
   void _keluar(BuildContext context) {
     showDialog(
@@ -25,10 +53,16 @@ class ProfilPage extends StatelessWidget {
             child: const Text('Batal'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const HomePage()),
-              (_) => false,
-            ),
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await AppRepository.logout();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const HomePage()),
+                  (_) => false,
+                );
+              }
+            },
             child: const Text('Keluar', style: TextStyle(color: Colors.red)),
           ),
         ],
@@ -39,7 +73,7 @@ class ProfilPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: JudulAppBar(judul: 'Profil', onBack: onBack),
+      appBar: JudulAppBar(judul: 'Profil', onBack: widget.onBack),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
@@ -53,7 +87,7 @@ class ProfilPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            nama,
+            _nama,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 18,
@@ -63,7 +97,7 @@ class ProfilPage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            peran,
+            _peran,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, color: AppColors.textGrey),
           ),

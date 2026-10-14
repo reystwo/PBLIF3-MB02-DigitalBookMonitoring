@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/data/dummy_data.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
+import 'package:digital_book_connect/services/app_repository.dart';
 
 class DetailCatatanPage extends StatelessWidget {
   final Catatan catatan;
@@ -56,15 +57,27 @@ class DetailCatatanPage extends StatelessWidget {
               label: 'Kirim',
               icon: Icons.send_rounded,
               stadium: true,
-              onPressed: () {
-                if (controller.text.trim().isEmpty) return;
+              onPressed: () async {
+                final isiBalasan = controller.text.trim();
+                if (isiBalasan.isEmpty) return;
+
                 Navigator.of(sheetContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Balasan berhasil dikirim'),
-                    backgroundColor: AppColors.primary,
-                  ),
-                );
+
+                if (catatan.idCatatan != null && catatan.idCatatan! > 0) {
+                  await AppRepository.replyCatatan(
+                    idCatatan: catatan.idCatatan!,
+                    isi: isiBalasan,
+                  );
+                }
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Balasan berhasil dikirim'),
+                      backgroundColor: AppColors.primary,
+                    ),
+                  );
+                }
               },
             ),
           ],

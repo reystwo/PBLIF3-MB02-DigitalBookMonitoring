@@ -3,6 +3,7 @@ import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/screens/admin/admin_main_page.dart';
 import 'package:digital_book_connect/screens/guru/guru_main_page.dart';
 import 'package:digital_book_connect/screens/orang_tua/orang_tua_main_page.dart';
+import 'package:digital_book_connect/services/app_repository.dart';
 
 enum UserRole {
   guru('Guru', Icons.school_outlined),
@@ -28,6 +29,7 @@ class _LoginPageState extends State<LoginPage> {
 
   UserRole _selectedRole = UserRole.guru;
   bool _isPasswordVisible = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -36,17 +38,51 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Sementara tanpa autentikasi: langsung ke dashboard sesuai role
-      final Widget dashboard = switch (_selectedRole) {
-        UserRole.guru => const GuruMainPage(),
-        UserRole.orangTua => const OrangTuaMainPage(),
-        UserRole.admin => const AdminMainPage(),
+  Future<void> _handleLogin() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _isLoading = true);
+
+    final roleStr = switch (_selectedRole) {
+      UserRole.guru => 'guru',
+      UserRole.orangTua => 'orang_tua',
+      UserRole.admin => 'admin',
+    };
+
+    final response = await AppRepository.login(
+      username: _usernameController.text.trim(),
+      password: _passwordController.text,
+      role: roleStr,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (response.isSuccess) {
+      final user = response.data;
+      final role = user?.role ?? roleStr;
+
+      final Widget dashboard = switch (role) {
+        'guru' => const GuruMainPage(),
+        'orang_tua' => const OrangTuaMainPage(),
+        'admin' => const AdminMainPage(),
+        _ => switch (_selectedRole) {
+          UserRole.guru => const GuruMainPage(),
+          UserRole.orangTua => const OrangTuaMainPage(),
+          UserRole.admin => const AdminMainPage(),
+        },
       };
+
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => dashboard),
         (_) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response.message),
+          backgroundColor: Colors.red.shade700,
+        ),
       );
     }
   }
@@ -251,24 +287,33 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _handleLogin,
+                        onPressed: _isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: const StadiumBorder(),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Masuk',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(Icons.login_rounded, size: 20),
-                          ],
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Masuk',
+                                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Icon(Icons.login_rounded, size: 20),
+                                ],
+                              ),
                       ),
                     ),
                     const SizedBox(height: 16),

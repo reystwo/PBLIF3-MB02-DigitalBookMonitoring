@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/data/dummy_data.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
+import 'package:digital_book_connect/services/app_repository.dart';
 
 class TambahCatatanPage extends StatefulWidget {
   final Siswa siswa;
@@ -23,6 +24,7 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
   String _kategori = kategoriCatatan.first;
   DateTime _tanggal = DateTime.now();
   Lampiran? _lampiran;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -49,23 +51,46 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
     });
   }
 
-  void _simpan() {
+  Future<void> _simpan() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _isSaving = true);
+    final isi = _isiController.text.trim();
+
+    final res = await AppRepository.createCatatan(
+      idSiswa: widget.siswa.idSiswa ?? 1,
+      isi: isi,
+      kategori: _kategori,
+      tanggal: _tanggal,
+      lampiranNama: _lampiran?.namaFile,
+      lampiranUkuran: _lampiran?.ukuran,
+    );
+
+    // Update list catatan lokal sebagai fallback
     daftarCatatan.insert(
       0,
-      Catatan(
-        penulis: 'Bapak Ahmad',
-        peranPenulis: 'Guru Kelas 5A',
-        siswa: widget.siswa,
-        kategori: _kategori,
-        tanggal: _tanggal,
-        isi: _isiController.text.trim(),
-        lampiran: _lampiran,
-      ),
+      res.isSuccess && res.data != null
+          ? Catatan.fromModel(res.data!)
+          : Catatan(
+              idCatatan: DateTime.now().millisecondsSinceEpoch,
+              penulis: 'Bapak Ahmad',
+              peranPenulis: 'Guru Kelas 5A',
+              siswa: widget.siswa,
+              kategori: _kategori,
+              tanggal: _tanggal,
+              isi: isi,
+              lampiran: _lampiran,
+            ),
     );
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Catatan untuk ${widget.siswa.nama} berhasil disimpan'),
+        content: Text(res.isSuccess
+            ? 'Catatan untuk ${widget.siswa.nama} berhasil disimpan'
+            : 'Catatan disimpan secara lokal: ${res.message}'),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -161,7 +186,10 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
             _KotakLampiran(lampiran: _lampiran, onTap: _pilihLampiran),
             const SizedBox(height: 28),
 
-            TombolUtama(label: 'Simpan Catatan', onPressed: _simpan),
+            TombolUtama(
+              label: _isSaving ? 'Menyimpan...' : 'Simpan Catatan',
+              onPressed: _isSaving ? null : _simpan,
+            ),
           ],
         ),
       ),

@@ -2,12 +2,42 @@
 // DATA DUMMY - dipakai sementara sampai backend tersedia
 // =============================================================
 
+import 'package:digital_book_connect/models/siswa_model.dart';
+import 'package:digital_book_connect/models/catatan_model.dart';
+
 class Siswa {
+  final int? idSiswa;
   final String nama;
   final String kelas;
   final bool perempuan;
 
-  const Siswa({required this.nama, required this.kelas, this.perempuan = false});
+  const Siswa({
+    this.idSiswa,
+    required this.nama,
+    required this.kelas,
+    this.perempuan = false,
+  });
+
+  factory Siswa.fromModel(SiswaModel model) {
+    return Siswa(
+      idSiswa: model.idSiswa,
+      nama: model.nama,
+      kelas: model.kelas,
+      perempuan: model.perempuan,
+    );
+  }
+
+  SiswaModel toModel() {
+    return SiswaModel(
+      idSiswa: idSiswa ?? 0,
+      nis: '',
+      nama: nama,
+      jenisKelamin: perempuan ? 'P' : 'L',
+      perempuan: perempuan,
+      idKelas: 0,
+      kelas: kelas,
+    );
+  }
 }
 
 class Lampiran {
@@ -18,6 +48,7 @@ class Lampiran {
 }
 
 class Catatan {
+  final int? idCatatan;
   final String penulis;
   final String peranPenulis; // contoh: "Guru Kelas 5A" / "Orang Tua"
   final bool penulisPerempuan;
@@ -28,6 +59,7 @@ class Catatan {
   final Lampiran? lampiran;
 
   const Catatan({
+    this.idCatatan,
     required this.penulis,
     required this.peranPenulis,
     required this.siswa,
@@ -37,20 +69,51 @@ class Catatan {
     this.penulisPerempuan = false,
     this.lampiran,
   });
+
+  factory Catatan.fromModel(CatatanModel model) {
+    return Catatan(
+      idCatatan: model.idCatatan,
+      penulis: model.penulis,
+      peranPenulis: model.peranPenulis,
+      penulisPerempuan: model.penulisPerempuan,
+      siswa: Siswa.fromModel(model.siswa),
+      kategori: model.kategori,
+      tanggal: model.tanggal,
+      isi: model.isi,
+      lampiran: model.lampiran != null
+          ? Lampiran(
+              namaFile: model.lampiran!.namaFile,
+              ukuran: model.lampiran!.ukuran,
+            )
+          : null,
+    );
+  }
 }
 
 class Aktivitas {
+  final int? idCatatan;
   final String nama;
   final String keterangan;
   final String waktu;
   final bool perempuan;
 
   const Aktivitas({
+    this.idCatatan,
     required this.nama,
     required this.keterangan,
     required this.waktu,
     this.perempuan = false,
   });
+
+  factory Aktivitas.fromModel(AktivitasModel model) {
+    return Aktivitas(
+      idCatatan: model.idCatatan,
+      nama: model.nama,
+      keterangan: model.keterangan,
+      waktu: model.waktu,
+      perempuan: model.perempuan,
+    );
+  }
 }
 
 const List<String> daftarKelas = ['5A', '5B'];
