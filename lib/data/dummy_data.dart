@@ -27,6 +27,10 @@ class Siswa {
     );
   }
 
+  factory Siswa.fromJson(Map<String, dynamic> json) {
+    return Siswa.fromModel(SiswaModel.fromJson(json));
+  }
+
   SiswaModel toModel() {
     return SiswaModel(
       idSiswa: idSiswa ?? 0,
@@ -38,6 +42,8 @@ class Siswa {
       kelas: kelas,
     );
   }
+
+  Map<String, dynamic> toJson() => toModel().toJson();
 }
 
 class Lampiran {
@@ -45,6 +51,13 @@ class Lampiran {
   final String ukuran;
 
   const Lampiran({required this.namaFile, required this.ukuran});
+
+  factory Lampiran.fromJson(Map<String, dynamic> json) {
+    return Lampiran(
+      namaFile: json['nama_file']?.toString() ?? json['namaFile']?.toString() ?? '',
+      ukuran: json['ukuran']?.toString() ?? '1.0 MB',
+    );
+  }
 }
 
 class Catatan {
@@ -88,6 +101,10 @@ class Catatan {
           : null,
     );
   }
+
+  factory Catatan.fromJson(Map<String, dynamic> json) {
+    return Catatan.fromModel(CatatanModel.fromJson(json));
+  }
 }
 
 class Aktivitas {
@@ -113,6 +130,10 @@ class Aktivitas {
       waktu: model.waktu,
       perempuan: model.perempuan,
     );
+  }
+
+  factory Aktivitas.fromJson(Map<String, dynamic> json) {
+    return Aktivitas.fromModel(AktivitasModel.fromJson(json));
   }
 }
 

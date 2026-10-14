@@ -122,7 +122,7 @@ class CatatanController extends Controller
         }
 
         // Tandai dibaca jika user saat ini adalah penerima catatan
-        if ($catatan->id_penerima === $user->id_user && $catatan->status_dibaca === 'belum_dibaca') {
+        if ((int) $catatan->id_penerima === (int) $user->id_user && $catatan->status_dibaca === 'belum_dibaca') {
             $catatan->update(['status_dibaca' => 'dibaca']);
             $catatan->status_dibaca = 'dibaca';
         }

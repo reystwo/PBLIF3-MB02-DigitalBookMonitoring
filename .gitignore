@@ -46,3 +46,11 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Backend Laravel related
+backend/.env
+backend/.env.backup
+backend/.env.production
+backend/vendor/
+backend/.phpunit.cache/
+backend/.phpunit.result.cache

@@ -28,6 +28,10 @@ class CatatanPenghubung extends Model
     protected function casts(): array
     {
         return [
+            'id_catatan' => 'integer',
+            'id_siswa' => 'integer',
+            'id_pengirim' => 'integer',
+            'id_penerima' => 'integer',
             'tanggal' => 'datetime',
         ];
     }
