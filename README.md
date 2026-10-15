@@ -33,12 +33,12 @@ digital_book_connect/
 │   ├── routes/api.php              # Definisi rute RESTful API
 │   └── tests/Feature/              # AuthApiTest, CatatanDanSiswaApiTest, EndToEndBookConnectTest
 ├── lib/                       # Frontend Mobile (Flutter)
-│   ├── config/api_config.dart      # Konfigurasi dinamis platform Base URL (10.0.2.2 vs 127.0.0.1)
+│   ├── config/api_config.dart      # Smart fallback URL, Auto-Discovery, & custom server URL (SharedPreferences)
 │   ├── data/dummy_data.dart        # Model adapter & fallback data offline
 │   ├── models/                     # UserModel, SiswaModel, KelasModel, CatatanModel
 │   ├── screens/
 │   │   ├── admin/                  # Dashboard & kelola Admin
-│   │   ├── auth/                   # Halaman Login multi-role (Guru, Ortu, Admin)
+│   │   ├── auth/                   # Halaman Login multi-role & dialog Pengaturan Server API (HP fisik / LAN)
 │   │   ├── catatan/                # Tambah catatan, riwayat catatan, detail & balas catatan
 │   │   ├── guru/                   # Dashboard Guru kelas & navigasi
 │   │   ├── home/                   # Halaman Landing & Selamat Datang
@@ -47,12 +47,12 @@ digital_book_connect/
 │   │   ├── profil/                 # Profil akun & tombol Logout riil
 │   │   └── siswa/                  # Daftar siswa per kelas & pencarian
 │   ├── services/
-│   │   ├── api_service.dart        # HTTP Client wrapper (Bearer token, error handling)
+│   │   ├── api_service.dart        # HTTP Client wrapper (Bearer token, error handling, auto retry fallback)
 │   │   ├── app_repository.dart     # Service layer pemanggilan endpoint backend
 │   │   └── session_manager.dart    # Token & session persistence (SharedPreferences)
 │   └── widgets/app_widgets.dart    # Desain sistem UI reusable, kartu, avatar, & navbar
 ├── test/
-│   ├── models_and_api_test.dart    # Unit test serialisasi JSON model
+│   ├── models_and_api_test.dart    # Unit test serialisasi JSON model & ApiConfig smart fallback
 │   └── widget_test.dart            # Widget smoke test, navigasi, dan validasi form login
 ├── analysis_options.yaml      # Konfigurasi linter Dart (mengabaikan backend/)
 └── pubspec.yaml               # Dependensi Flutter (http, shared_preferences)
@@ -135,18 +135,32 @@ Seluruh akun di bawah ini telah disiapkan otomatis melalui seeder (`DatabaseSeed
    ```bash
    php artisan serve --host=0.0.0.0 --port=8000
    ```
-   *Server backend akan aktif di `http://127.0.0.1:8000` (atau `http://10.0.2.2:8000` untuk emulator Android).*
+   *Opsi `--host=0.0.0.0` memastikan API dapat diakses oleh HP fisik lewat LAN/Wi-Fi maupun Chrome (`127.0.0.1:8000`).*
 
 ### Langkah 2: Setup Frontend Flutter
 1. Buka terminal baru di root folder `digital_book_connect/`:
    ```bash
    flutter pub get
    ```
-2. Jalankan aplikasi Flutter:
-   ```bash
-   flutter run
-   ```
-   *Pilih device target (Chrome, Windows Desktop, atau Android Emulator).*
+2. Jalankan aplikasi Flutter sesuai perangkat target:
+   - **Chrome / Web**:
+     ```bash
+     flutter run -d chrome
+     ```
+   - **HP Fisik Android via Kabel USB (Direkomendasikan)**:
+     Aktifkan *USB Debugging* pada ponsel, hubungkan dengan kabel USB ke laptop, lalu aktifkan penerusan port:
+     ```bash
+     adb reverse tcp:8000 tcp:8000
+     flutter run
+     ```
+     *(Aplikasi di ponsel langsung terhubung ke backend lokal melalui `http://127.0.0.1:8000/api`)*.
+   - **HP Fisik Android via Jaringan Wi-Fi (Tanpa Kabel USB)**:
+     Pastikan laptop dan ponsel berada di jaringan Wi-Fi yang sama. Buka ikon **Pengaturan Server API** (`Icons.settings_ethernet_rounded`) di pojok kanan atas halaman Login, pilih opsi **Wi-Fi** (contoh: `http://192.168.1.7:8000/api`), tekan **Tes Koneksi**, lalu simpan URL.
+   - **Android Emulator**:
+     ```bash
+     flutter run
+     ```
+     *(Aplikasi otomatis mendeteksi dan menggunakan fallback emulator `http://10.0.2.2:8000/api`)*.
 
 ---
 
@@ -156,6 +170,7 @@ Seluruh endpoint terproteksi memerlukan header `Authorization: Bearer <token>` y
 
 | Method | Endpoint | Hak Akses (Role) | Fungsi / Deskripsi |
 | :---: | :--- | :---: | :--- |
+| `GET` | `/api/health` | Publik | Pemeriksaan status server & ketersediaan koneksi API |
 | `POST` | `/api/login` | Publik | Autentikasi pengguna & generate token Sanctum |
 | `GET` | `/api/me` | Semua Role | Mengambil profil user yang sedang login |
 | `POST` | `/api/logout` | Semua Role | Menghapus token sesi aktif & logout |
@@ -188,5 +203,6 @@ Mencakup pengujian autentikasi (`AuthApiTest`), otorisasi catatan & isolasi priv
 flutter analyze
 flutter test
 ```
-*Hasil:* **No issues found!** dan **All 10 tests passed!**  
-Mencakup pengujian rendering widget antarmuka, navigasi antar halaman, validasi formulir input login, dan unit test serialisasi model JSON.
+*Hasil:* **No issues found!** dan **All 12 tests passed! (100% PASS)**  
+Mencakup pengujian rendering widget antarmuka, navigasi antar halaman, validasi formulir input login, unit test serialisasi model JSON, serta pengujian mekanisme smart fallback dan kustomisasi base URL `ApiConfig`.
+
