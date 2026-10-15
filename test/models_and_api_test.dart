@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:digital_book_connect/config/api_config.dart';
 import 'package:digital_book_connect/models/user_model.dart';
 import 'package:digital_book_connect/models/siswa_model.dart';
 import 'package:digital_book_connect/models/catatan_model.dart';
@@ -112,6 +114,29 @@ void main() {
       );
       expect(resp.isSuccess, isTrue);
       expect(resp.data, equals('Halo'));
+    });
+  });
+
+  group('ApiConfig Smart Fallback & Base URL Tests', () {
+    setUp(() {
+      // Mock SharedPreferences memory store for unit testing
+      // ignore: invalid_use_of_visible_for_testing_member
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('ApiConfig default candidates contains local USB, LAN IP, and Emulator URLs', () {
+      expect(ApiConfig.candidateUrls, contains('http://127.0.0.1:8000/api'));
+      expect(ApiConfig.candidateUrls, contains('http://192.168.1.7:8000/api'));
+      expect(ApiConfig.candidateUrls, contains('http://10.0.2.2:8000/api'));
+    });
+
+    test('ApiConfig custom base URL setter and reset mechanism', () async {
+      await ApiConfig.setCustomBaseUrl('http://192.168.1.100:8000/api');
+      expect(ApiConfig.baseUrl, equals('http://192.168.1.100:8000/api'));
+      expect(ApiConfig.hasCustomBaseUrl, isTrue);
+
+      await ApiConfig.resetBaseUrl();
+      expect(ApiConfig.hasCustomBaseUrl, isFalse);
     });
   });
 }

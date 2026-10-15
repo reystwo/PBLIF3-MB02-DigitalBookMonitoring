@@ -2,9 +2,12 @@
 // BUKU PENGHUBUNG DIGITAL - Entry Point
 // =============================================================
 import 'package:flutter/material.dart';
+import 'package:digital_book_connect/config/api_config.dart';
 import 'package:digital_book_connect/screens/home/home_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiConfig.init();
   runApp(const MyApp());
 }
 
