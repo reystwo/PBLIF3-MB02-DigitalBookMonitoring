@@ -1,7 +1,7 @@
 # Digital Book Connect
 
 > **Aplikasi Buku Penghubung Digital antara Guru, Orang Tua / Wali Murid, dan Administrator Sekolah**  
-> Proyek Berbasis Pembelajaran (Project-Based Learning / PBL) — Program Studi Teknik Informatika / Rekayasa Perangkat Lunak.
+> Proyek Berbasis Pembelajaran (Project-Based Learning / PBL) — Program Studi D3 Teknik Informatika Politeknik Negeri Batam.
 
 ---
 
