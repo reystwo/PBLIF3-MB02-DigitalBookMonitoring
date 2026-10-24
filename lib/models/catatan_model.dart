@@ -39,6 +39,8 @@ class CatatanModel {
   final String statusDibaca;
   final SiswaModel siswa;
   final LampiranModel? lampiran;
+  // Waktu catatan disimpan di server (created_at); null pada data lama/dummy
+  final DateTime? dibuatPada;
 
   const CatatanModel({
     required this.idCatatan,
@@ -55,6 +57,7 @@ class CatatanModel {
     this.statusDibaca = 'belum_dibaca',
     required this.siswa,
     this.lampiran,
+    this.dibuatPada,
   });
 
   factory CatatanModel.fromJson(Map<String, dynamic> json) {
@@ -107,6 +110,7 @@ class CatatanModel {
       statusDibaca: json['status_dibaca']?.toString() ?? 'belum_dibaca',
       siswa: SiswaModel.fromJson(siswaJson),
       lampiran: lampiranParsed,
+      dibuatPada: DateTime.tryParse(json['created_at']?.toString() ?? ''),
     );
   }
 }

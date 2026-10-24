@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\FormatCatatan;
 use App\Http\Controllers\Controller;
 use App\Models\CatatanPenghubung;
 use App\Models\Siswa;
@@ -12,13 +13,7 @@ use Illuminate\Http\Request;
 
 class CatatanController extends Controller
 {
-    /**
-     * Nama-nama bulan Indonesia untuk format label tanggal.
-     */
-    private const BULAN_ID = [
-        1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'Mei', 6 => 'Jun',
-        7 => 'Jul', 8 => 'Agu', 9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
-    ];
+    use FormatCatatan;
 
     /**
      * Dapatkan daftar catatan penghubung.
@@ -27,7 +22,7 @@ class CatatanController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = CatatanPenghubung::with(['siswa.kelas', 'pengirim.guru.kelasWali', 'pengirim.orangTua', 'penerima']);
+        $query = CatatanPenghubung::with(self::RELASI_CATATAN);
 
         // Proteksi Privasi Wajib SEC-02:
         if ($user->role === 'orang_tua') {
@@ -39,16 +34,7 @@ class CatatanController extends Controller
             $query->whereIn('id_siswa', $anakIds);
         } elseif ($user->role === 'guru') {
             // Guru dapat melihat catatan yang dikirim/diterima olehnya, atau siswa di kelas yang dia ampu
-            $idGuru = $user->guru?->id_guru;
-            $kelasWaliIds = $user->guru?->kelasWali?->pluck('id_kelas') ?? collect();
-
-            $query->where(function ($q) use ($user, $kelasWaliIds) {
-                $q->where('id_pengirim', $user->id_user)
-                    ->orWhere('id_penerima', $user->id_user)
-                    ->orWhereHas('siswa', function ($sq) use ($kelasWaliIds) {
-                        $sq->whereIn('id_kelas', $kelasWaliIds);
-                    });
-            });
+            $query->dapatDiaksesGuru($user);
         }
         // Admin: tidak dibatasi
 
@@ -96,8 +82,7 @@ class CatatanController extends Controller
     public function show(Request $request, int|string $id): JsonResponse
     {
         $user = $request->user();
-        $catatan = CatatanPenghubung::with(['siswa.kelas', 'pengirim.guru.kelasWali', 'pengirim.orangTua', 'penerima'])
-            ->find($id);
+        $catatan = CatatanPenghubung::with(self::RELASI_CATATAN)->find($id);
 
         if (! $catatan) {
             return response()->json([
@@ -119,6 +104,10 @@ class CatatanController extends Controller
                     'message' => 'Akses ditolak. Anda tidak berhak melihat catatan siswa ini.',
                 ], 403);
             }
+        }
+
+        if ($this->guruTidakBerhak($user, $catatan)) {
+            return $this->ditolak('Akses ditolak. Anda tidak berhak melihat catatan siswa ini.');
         }
 
         // Tandai dibaca jika user saat ini adalah penerima catatan
@@ -168,10 +157,31 @@ class CatatanController extends Controller
             ], 422);
         }
 
+        if (mb_strlen($isiTeks) > CatatanPenghubung::MAKS_ISI) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Isi catatan maksimal ' . CatatanPenghubung::MAKS_ISI . ' karakter.',
+            ], 422);
+        }
+
         $siswa = Siswa::with('orangTua.user')->findOrFail($validated['id_siswa']);
+
+        // Guru hanya boleh menulis catatan untuk siswa di kelas yang ia ampu
+        if ($user->role === 'guru' && ! $user->guru?->bertanggungJawabAtas($siswa)) {
+            return $this->ditolak('Akses ditolak. Siswa ini bukan tanggung jawab Anda.');
+        }
 
         // Tentukan id_penerima secara otomatis jika tidak dikirim
         $idPenerima = $validated['id_penerima'] ?? null;
+
+        // Penerima dari Guru wajib orang tua/wali siswa tersebut agar catatan tidak bocor ke pihak lain
+        if ($idPenerima && $user->role === 'guru' && ! $siswa->orangTua->contains('id_user', (int) $idPenerima)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Penerima catatan harus orang tua/wali dari siswa tersebut.',
+            ], 422);
+        }
+
         if (! $idPenerima) {
             $ortuUtama = $siswa->orangTua->first();
             $idPenerima = $ortuUtama?->id_user ?? $user->id_user;
@@ -191,7 +201,7 @@ class CatatanController extends Controller
             'lampiran_ukuran' => $validated['lampiran_ukuran'] ?? null,
         ]);
 
-        $catatan->load(['siswa.kelas', 'pengirim.guru.kelasWali', 'pengirim.orangTua', 'penerima']);
+        $catatan->load(self::RELASI_CATATAN);
 
         return response()->json([
             'success' => true,
@@ -228,6 +238,10 @@ class CatatanController extends Controller
                     'message' => 'Akses ditolak. Anda tidak berhak membalas catatan siswa ini.',
                 ], 403);
             }
+        }
+
+        if ($this->guruTidakBerhak($user, $catatanAsal)) {
+            return $this->ditolak('Akses ditolak. Anda tidak berhak membalas catatan siswa ini.');
         }
 
         $validated = $request->validate([
@@ -269,7 +283,7 @@ class CatatanController extends Controller
             'lampiran_ukuran' => null,
         ]);
 
-        $balasan->load(['siswa.kelas', 'pengirim.guru.kelasWali', 'pengirim.orangTua', 'penerima']);
+        $balasan->load(self::RELASI_CATATAN);
 
         return response()->json([
             'success' => true,
@@ -292,6 +306,10 @@ class CatatanController extends Controller
             ], 404);
         }
 
+        if ($this->guruTidakBerhak($request->user(), $catatan)) {
+            return $this->ditolak('Akses ditolak. Anda tidak berhak mengubah catatan ini.');
+        }
+
         $catatan->update(['status_dibaca' => 'dibaca']);
 
         return response()->json([
@@ -305,53 +323,19 @@ class CatatanController extends Controller
     }
 
     /**
-     * Helper untuk format objek Catatan yang kompatibel dengan UI Flutter.
+     * True bila user adalah Guru dan catatan berada di luar cakupan aksesnya.
      */
-    private function formatCatatanItem(CatatanPenghubung $c): array
+    private function guruTidakBerhak(User $user, CatatanPenghubung $catatan): bool
     {
-        $pengirimUser = $c->pengirim;
-        $peranPenulis = 'Pengguna';
+        return $user->role === 'guru'
+            && ! CatatanPenghubung::whereKey($catatan->id_catatan)->dapatDiaksesGuru($user)->exists();
+    }
 
-        if ($pengirimUser) {
-            if ($pengirimUser->role === 'guru') {
-                $kelasWali = $pengirimUser->guru?->kelasWali?->first();
-                $peranPenulis = $kelasWali ? "Guru Kelas {$kelasWali->nama_kelas}" : 'Guru';
-            } elseif ($pengirimUser->role === 'orang_tua') {
-                $peranPenulis = 'Orang Tua';
-            } elseif ($pengirimUser->role === 'admin') {
-                $peranPenulis = 'Administrator';
-            }
-        }
-
-        $tanggalObj = $c->tanggal instanceof Carbon ? $c->tanggal : Carbon::parse($c->tanggal);
-        $tglStr = $tanggalObj->format('Y-m-d H:i:s');
-        $labelTanggal = "{$tanggalObj->day} " . (self::BULAN_ID[$tanggalObj->month] ?? '') . " {$tanggalObj->year}";
-
-        return [
-            'id_catatan' => $c->id_catatan,
-            'id_siswa' => $c->id_siswa,
-            'id_pengirim' => $c->id_pengirim,
-            'id_penerima' => $c->id_penerima,
-            'penulis' => $pengirimUser?->nama ?? 'Sistem',
-            'peran_penulis' => $peranPenulis,
-            'penulis_perempuan' => false,
-            'kategori' => $c->kategori ?? 'Umum',
-            'isi_catatan' => $c->isi_catatan,
-            'isi' => $c->isi_catatan,
-            'tanggal' => $tglStr,
-            'tanggal_label' => $labelTanggal,
-            'status_dibaca' => $c->status_dibaca,
-            'siswa' => [
-                'id_siswa' => $c->siswa?->id_siswa ?? $c->id_siswa,
-                'nama' => $c->siswa?->nama ?? '',
-                'kelas' => $c->siswa?->kelas?->nama_kelas ?? '',
-                'jenis_kelamin' => $c->siswa?->jenis_kelamin ?? 'L',
-                'perempuan' => $c->siswa?->perempuan ?? false,
-            ],
-            'lampiran' => ! empty($c->lampiran_nama) ? [
-                'nama_file' => $c->lampiran_nama,
-                'ukuran' => $c->lampiran_ukuran ?? '1.0 MB',
-            ] : null,
-        ];
+    private function ditolak(string $message): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+        ], 403);
     }
 }

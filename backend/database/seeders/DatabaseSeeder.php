@@ -9,6 +9,7 @@ use App\Models\Kelas;
 use App\Models\Siswa;
 use App\Models\CatatanPenghubung;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
@@ -279,6 +280,12 @@ class DatabaseSeeder extends Seeder
             'status_dibaca' => 'belum_dibaca',
             'lampiran_nama' => null,
             'lampiran_ukuran' => null,
+        ]);
+
+        // Waktu pembuatan catatan contoh disamakan dengan tanggalnya agar urutan riwayat realistis
+        DB::table('catatan_penghubung')->update([
+            'created_at' => DB::raw('tanggal'),
+            'updated_at' => DB::raw('tanggal'),
         ]);
     }
 }

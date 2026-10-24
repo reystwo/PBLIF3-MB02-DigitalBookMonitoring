@@ -12,7 +12,6 @@ import 'package:digital_book_connect/screens/profil/profil_page.dart';
 
 import 'package:digital_book_connect/services/session_manager.dart';
 import 'package:digital_book_connect/services/app_repository.dart';
-import 'package:digital_book_connect/models/catatan_model.dart';
 
 class GuruMainPage extends StatefulWidget {
   const GuruMainPage({super.key});
@@ -101,18 +100,30 @@ class _GuruDashboardState extends State<_GuruDashboard> {
       if (res.isSuccess && res.data != null && mounted) {
         final data = res.data!;
         setState(() {
-          if (data['kelas'] is Map) {
-            _kelasNama = data['kelas']['nama_kelas']?.toString() ?? _kelasNama;
-          }
-          if (data['aktivitas_terbaru'] is List) {
-            final list = (data['aktivitas_terbaru'] as List)
-                .map((a) => Aktivitas.fromModel(AktivitasModel.fromJson(a)))
+          final kelasWali = data['kelas_wali'];
+          _kelasNama = kelasWali is Map && kelasWali['nama_kelas'] != null
+              ? 'Kelas ${kelasWali['nama_kelas']}'
+              : 'Belum menjadi wali kelas';
+          if (data['catatan_terbaru'] is List) {
+            _listAktivitas = (data['catatan_terbaru'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map(_aktivitasDariCatatan)
                 .toList();
-            if (list.isNotEmpty) _listAktivitas = list;
           }
         });
       }
     } catch (_) {}
+  }
+
+  // Ringkasan catatan dari /dashboard (catatan_terbaru) untuk daftar aktivitas
+  Aktivitas _aktivitasDariCatatan(Map<String, dynamic> c) {
+    final tanggal = DateTime.tryParse(c['tanggal']?.toString() ?? '');
+    return Aktivitas(
+      idCatatan: int.tryParse(c['id_catatan']?.toString() ?? ''),
+      nama: c['nama_siswa']?.toString() ?? 'Siswa',
+      keterangan: '${c['kategori'] ?? 'Umum'} · oleh ${c['penulis'] ?? '-'}',
+      waktu: tanggal != null ? formatTanggal(tanggal) : '',
+    );
   }
 
   @override
@@ -182,7 +193,8 @@ class _GuruDashboardState extends State<_GuruDashboard> {
                 MenuCard(
                   icon: Icons.edit_note_rounded,
                   label: 'Tambah Catatan',
-                  onTap: () => bukaHalaman(context, const DaftarSiswaPage(judul: 'Pilih Siswa')),
+                  onTap: () =>
+                      bukaHalaman(context, const DaftarSiswaPage(judul: 'Pilih Siswa', pilihUntukCatatan: true)),
                 ),
                 MenuCard(icon: Icons.history_rounded, label: 'Riwayat Catatan', onTap: () => widget.onKeTab(2)),
                 MenuCard(
@@ -199,18 +211,28 @@ class _GuruDashboardState extends State<_GuruDashboard> {
               onLihatSemua: () => bukaHalaman(context, const NotifikasiPage()),
             ),
             const SizedBox(height: 12),
-            ListCard(
-              children: [
-                for (final a in _listAktivitas)
-                  ListItemTile(
-                    judul: Text(a.nama),
-                    subjudul: a.keterangan,
-                    keterangan: a.waktu,
-                    perempuan: a.perempuan,
-                    onTap: () => widget.onKeTab(2),
-                  ),
-              ],
-            ),
+            if (_listAktivitas.isEmpty)
+              Container(
+                decoration: kartuDecoration(),
+                padding: const EdgeInsets.all(14),
+                child: const Text(
+                  'Belum ada aktivitas catatan.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textGrey),
+                ),
+              )
+            else
+              ListCard(
+                children: [
+                  for (final a in _listAktivitas)
+                    ListItemTile(
+                      judul: Text(a.nama),
+                      subjudul: a.keterangan,
+                      keterangan: a.waktu,
+                      perempuan: a.perempuan,
+                      onTap: () => widget.onKeTab(2),
+                    ),
+                ],
+              ),
           ],
         ),
       ),

@@ -16,6 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserRole::class,
         ]);
+
+        // Cek role dijalankan sebelum route model binding agar pengguna tanpa hak
+        // akses selalu mendapat 403, bukan 404 yang membocorkan keberadaan data.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsureUserRole::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

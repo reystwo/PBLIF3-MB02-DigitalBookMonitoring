@@ -208,6 +208,8 @@ class ListItemTile extends StatelessWidget {
   final String? keterangan;
   final bool perempuan;
   final VoidCallback? onTap;
+  // Pengganti avatar default (opsional), mis. ikon kelas
+  final Widget? leading;
 
   const ListItemTile({
     super.key,
@@ -216,6 +218,7 @@ class ListItemTile extends StatelessWidget {
     this.keterangan,
     this.perempuan = false,
     this.onTap,
+    this.leading,
   });
 
   @override
@@ -226,7 +229,7 @@ class ListItemTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            AppAvatar(perempuan: perempuan),
+            leading ?? AppAvatar(perempuan: perempuan),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

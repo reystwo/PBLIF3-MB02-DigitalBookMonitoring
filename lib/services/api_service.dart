@@ -10,15 +10,27 @@ class ApiResponse<T> {
   final String message;
   final T? data;
   final int statusCode;
+  // Info halaman dari endpoint ber-pagination (current_page, last_page, per_page, total)
+  final Map<String, dynamic>? meta;
+  // Pesan validasi per field dari respons 422 Laravel
+  final Map<String, List<String>> errors;
 
   const ApiResponse({
     required this.success,
     required this.message,
     this.data,
     required this.statusCode,
+    this.meta,
+    this.errors = const {},
   });
 
   bool get isSuccess => success;
+
+  /// Pesan validasi pertama untuk sebuah field, atau null jika tidak ada.
+  String? errorFor(String field) {
+    final list = errors[field];
+    return (list != null && list.isNotEmpty) ? list.first : null;
+  }
 }
 
 class ApiService {
@@ -107,6 +119,47 @@ class ApiService {
     );
   }
 
+  /// PUT Request dengan dukungan Smart Fallback
+  static Future<ApiResponse<dynamic>> put(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool withAuth = true,
+  }) async {
+    return _executeWithFallback(
+      (baseUrl) async {
+        final uri = Uri.parse('$baseUrl$endpoint');
+        final headers = await _headers(withAuth: withAuth);
+        final response = await http
+            .put(
+              uri,
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(ApiConfig.timeoutDuration);
+
+        return _processResponse(response);
+      },
+    );
+  }
+
+  /// DELETE Request dengan dukungan Smart Fallback
+  static Future<ApiResponse<dynamic>> delete(
+    String endpoint, {
+    bool withAuth = true,
+  }) async {
+    return _executeWithFallback(
+      (baseUrl) async {
+        final uri = Uri.parse('$baseUrl$endpoint');
+        final headers = await _headers(withAuth: withAuth);
+        final response = await http
+            .delete(uri, headers: headers)
+            .timeout(ApiConfig.timeoutDuration);
+
+        return _processResponse(response);
+      },
+    );
+  }
+
   /// Wrapper eksekusi request dengan otomatis mencoba fallback URL jika URL pertama gagal
   static Future<ApiResponse<dynamic>> _executeWithFallback(
     Future<ApiResponse<dynamic>> Function(String baseUrl) requestFn,
@@ -161,10 +214,20 @@ class ApiService {
 
     final isSuccess = response.statusCode >= 200 && response.statusCode < 300;
     String message = 'Terjadi kesalahan';
+    Map<String, dynamic>? meta;
+    final errors = <String, List<String>>{};
 
     if (jsonBody is Map<String, dynamic>) {
       if (jsonBody['message'] != null) {
         message = jsonBody['message'].toString();
+      }
+      if (jsonBody['meta'] is Map<String, dynamic>) {
+        meta = jsonBody['meta'] as Map<String, dynamic>;
+      }
+      if (jsonBody['errors'] is Map<String, dynamic>) {
+        (jsonBody['errors'] as Map<String, dynamic>).forEach((field, pesan) {
+          errors[field] = pesan is List ? pesan.map((e) => e.toString()).toList() : [pesan.toString()];
+        });
       }
     }
 
@@ -173,6 +236,8 @@ class ApiService {
       message: message,
       data: jsonBody is Map<String, dynamic> ? jsonBody['data'] : jsonBody,
       statusCode: response.statusCode,
+      meta: meta,
+      errors: errors,
     );
   }
 }

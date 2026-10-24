@@ -10,7 +10,7 @@
 **Digital Book Connect** adalah platform komunikasi sekolah berbasis mobile dan REST API yang mendigitalisasi buku penghubung konvensional. Aplikasi ini memungkinkan:
 - **Guru**: Mencatat perkembangan siswa (akademik, perilaku, kesehatan, kegiatan), melihat daftar siswa per kelas, menerima dan membalas pesan dari orang tua secara real-time.
 - **Orang Tua / Wali**: Memantau perkembangan khusus anak kandung mereka secara privat (SEC-02), menerima notifikasi aktivitas, membaca catatan guru, dan mengirimkan balasan langsung.
-- **Administrator**: Memantau statistik keseluruhan sistem (jumlah pengguna, guru, orang tua, kelas, dan catatan aktif).
+- **Administrator**: Memantau statistik keseluruhan sistem serta mengelola data **Guru**, **Orang Tua**, **Siswa**, dan **Kelas** (daftar ber-pagination, pencarian, detail, tambah, ubah, hapus).
 
 ---
 
@@ -90,6 +90,16 @@ Seluruh akun di bawah ini telah disiapkan otomatis melalui seeder (`DatabaseSeed
 | **Orang Tua** | `ortu_dani` | `password123` | Bapak Bambang (Orang Tua dari Dani Pratama - 5B) |
 | **Orang Tua** | `ortu_fajar` | `password123` | Bapak Joko (Orang Tua dari Fajar Ramadhan - 5B) |
 | **Orang Tua** | `ortu_siti` | `password123` | Ibu Fatimah (Orang Tua dari Siti Aisyah - 5A) |
+
+---
+
+### Membuat Akun Admin Baru (Aman)
+Akun Admin **tidak dapat** dibuat atau dinaikkan melalui API (tidak ada endpoint registrasi, dan field `role` dari request selalu diabaikan). Buat akun Admin langsung dari server:
+```bash
+cd backend
+php artisan admin:buat <username> --nama="Nama Admin"
+```
+Kata sandi (minimal 8 karakter) diinput tersembunyi dua kali sehingga tidak tersimpan di riwayat terminal. Untuk server produksi, jangan gunakan akun demo `admin` / `password123` dari seeder.
 
 ---
 
@@ -177,12 +187,41 @@ Seluruh endpoint terproteksi memerlukan header `Authorization: Bearer <token>` y
 | `GET` | `/api/dashboard` | Semua Role | Mengambil data dashboard spesifik role |
 | `GET` | `/api/notifikasi` | Semua Role | Mengambil riwayat feed aktivitas & notifikasi |
 | `GET` | `/api/kelas` | Guru / Admin | Mengambil daftar kelas dan wali kelas |
-| `GET` | `/api/siswa` | Guru / Admin | Mengambil daftar siswa (filter `?kelas=5A`) |
+| `GET` | `/api/siswa` | Guru / Admin | Mengambil daftar siswa (filter `?kelas=5A`); Guru hanya mendapat siswa di kelas yang ia ampu |
 | `GET` | `/api/catatan` | Guru / Ortu / Admin | Mengambil riwayat catatan penghubung |
 | `GET` | `/api/catatan/{id}` | Guru / Ortu / Admin | Detail catatan & otomatis tandai `'dibaca'` |
 | `POST` | `/api/catatan` | Guru / Admin | Mengirim catatan penghubung baru untuk siswa |
 | `POST` | `/api/catatan/{id}/balas` | Guru / Ortu | Mengirim pesan balasan untuk suatu catatan |
 | `PATCH` | `/api/catatan/{id}/baca` | Penerima Catatan | Menandai catatan secara manual sebagai `'dibaca'` |
+
+### Endpoint Kelola Data (Khusus Admin)
+Seluruh endpoint di bawah dilindungi `auth:sanctum` + middleware `role:admin` (pengguna belum login → `401`, role lain / akun nonaktif → `403`). `{resource}` = `guru`, `orang-tua`, `siswa`, atau `kelas`.
+
+| Method | Endpoint | Fungsi / Deskripsi |
+| :---: | :--- | :--- |
+| `GET` | `/api/admin/{resource}?page=1&per_page=10&search=` | Daftar ber-pagination (maks. 50 per halaman) + pencarian. Respons memuat `meta` (`current_page`, `last_page`, `per_page`, `total`). Siswa juga mendukung filter `?id_kelas=` |
+| `POST` | `/api/admin/{resource}` | Tambah data (validasi `422` dengan `errors` per field) |
+| `GET` | `/api/admin/{resource}/{id}` | Detail data |
+| `PUT` | `/api/admin/{resource}/{id}` | Ubah data |
+| `DELETE` | `/api/admin/{resource}/{id}` | Hapus data; ditolak `409` jika data masih dipakai |
+
+Aturan penting:
+- **Guru / Orang Tua**: membuat akun `users` sekaligus profilnya; role selalu ditetapkan server (`guru` / `orang_tua`). Username & NIP unik. Mengganti kata sandi atau menonaktifkan akun mencabut seluruh token login akun tersebut.
+- **Siswa**: NIS unik, wajib terdaftar di satu kelas, dan dapat dihubungkan dengan beberapa orang tua (`hubungan`: Ayah / Ibu / Wali).
+- **Kelas**: nama kelas unik per tahun ajaran (format `YYYY/YYYY`), wali kelas wajib dipilih dari data guru.
+- **Pembatasan hapus**: guru yang masih menjadi wali kelas, orang tua yang masih terhubung dengan siswa, kelas yang masih berisi siswa, serta guru/orang tua/siswa yang memiliki catatan penghubung tidak dapat dihapus (gunakan status nonaktif untuk akun).
+
+### Endpoint Siswa & Catatan (Khusus Guru)
+Dilindungi `auth:sanctum` + middleware `role:guru`. Siswa yang menjadi tanggung jawab Guru adalah siswa di kelas yang ia ampu sebagai **wali kelas** (`kelas.id_wali_guru`). Siswa di luar cakupan → `403`, ID yang tidak ada → `404`.
+
+| Method | Endpoint | Fungsi / Deskripsi |
+| :---: | :--- | :--- |
+| `GET` | `/api/guru/siswa?page=1&per_page=10&search=` | Daftar siswa tanggung jawab (pencarian nama/NIS, ber-pagination + `meta`) |
+| `GET` | `/api/guru/siswa/{id}` | Detail siswa, wali kelas, orang tua/wali, jumlah catatan |
+| `GET` | `/api/guru/siswa/{id}/catatan?page=1` | Riwayat catatan siswa, terbaru lebih dulu (`created_at`), beserta nama pembuat |
+| `POST` | `/api/guru/siswa/{id}/catatan` | Tambah catatan: `isi_catatan` wajib (tidak boleh hanya spasi, maks. 500 karakter), `kategori`, `tanggal`. Pengirim selalu diambil dari akun login; `id_pengirim`/`id_siswa` di body diabaikan |
+
+Endpoint lama `/api/catatan/*` menerapkan cakupan yang sama untuk Guru: tidak dapat membuat, membuka, membalas, atau menandai dibaca catatan siswa di luar kelasnya, dan `id_penerima` harus orang tua/wali siswa tersebut.
 
 ---
 
@@ -195,7 +234,9 @@ Proyek ini dilengkapi dengan suite pengujian otomatis menyeluruh:
 cd backend
 php artisan test
 ```
-*Hasil:* **23 tests passed, 148 assertions (100% PASS)**  
+*Hasil:* **52 tests passed, 561 assertions (100% PASS)**  
+> Test memakai SQLite in-memory. Jika muncul error `could not find driver`, aktifkan `extension=pdo_sqlite` di `php.ini`, atau jalankan sekali pakai: `php -d extension=pdo_sqlite vendor/bin/phpunit`.
+
 Mencakup pengujian autentikasi (`AuthApiTest`), otorisasi catatan & isolasi privasi anak (`CatatanDanSiswaApiTest`), serta pengujian siklus penuh alur aplikasi (`EndToEndBookConnectTest`).
 
 ### Menjalankan Test Frontend Flutter
@@ -203,6 +244,6 @@ Mencakup pengujian autentikasi (`AuthApiTest`), otorisasi catatan & isolasi priv
 flutter analyze
 flutter test
 ```
-*Hasil:* **No issues found!** dan **All 12 tests passed! (100% PASS)**  
+*Hasil:* **No issues found!** dan **All 24 tests passed! (100% PASS)**  
 Mencakup pengujian rendering widget antarmuka, navigasi antar halaman, validasi formulir input login, unit test serialisasi model JSON, serta pengujian mekanisme smart fallback dan kustomisasi base URL `ApiConfig`.
 

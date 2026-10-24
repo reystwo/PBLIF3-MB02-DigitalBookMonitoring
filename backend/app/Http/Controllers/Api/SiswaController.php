@@ -35,6 +35,11 @@ class SiswaController extends Controller
             });
         }
 
+        // Guru HANYA boleh melihat siswa di kelas yang ia ampu sebagai wali kelas
+        if ($user->role === 'guru') {
+            $query->tanggungJawabGuru($user->guru);
+        }
+
         // Filter kelas (nama_kelas, misal: '5A', '5B')
         if ($request->filled('kelas')) {
             $namaKelas = $request->query('kelas');

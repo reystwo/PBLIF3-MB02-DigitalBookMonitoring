@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -30,6 +31,19 @@ class Siswa extends Model
     public function getPerempuanAttribute(): bool
     {
         return $this->jenis_kelamin === 'P';
+    }
+
+    /**
+     * Siswa yang menjadi tanggung jawab Guru, yaitu siswa di kelas yang ia ampu
+     * sebagai wali kelas (kelas.id_wali_guru). Tanpa profil guru: tidak ada siswa.
+     */
+    public function scopeTanggungJawabGuru(Builder $query, ?Guru $guru): Builder
+    {
+        if (! $guru) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('kelas', fn ($q) => $q->where('id_wali_guru', $guru->id_guru));
     }
 
     /**

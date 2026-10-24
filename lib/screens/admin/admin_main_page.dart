@@ -5,9 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
 import 'package:digital_book_connect/screens/profil/profil_page.dart';
+import 'package:digital_book_connect/screens/admin/kelola_guru_page.dart';
+import 'package:digital_book_connect/screens/admin/kelola_orang_tua_page.dart';
+import 'package:digital_book_connect/screens/admin/kelola_siswa_page.dart';
+import 'package:digital_book_connect/screens/admin/kelola_kelas_page.dart';
 
 import 'package:digital_book_connect/services/session_manager.dart';
 import 'package:digital_book_connect/services/app_repository.dart';
+
+// Menu kelola data Admin (dipakai di Beranda dan tab Data)
+const menuKelolaData = [
+  (Icons.person_rounded, 'Kelola Guru'),
+  (Icons.groups_rounded, 'Kelola Orang Tua'),
+  (Icons.school_rounded, 'Kelola Siswa'),
+  (Icons.diversity_3_rounded, 'Kelola Kelas'),
+];
+
+final Map<String, Widget Function()> halamanKelolaData = {
+  'Kelola Guru': () => const KelolaGuruPage(),
+  'Kelola Orang Tua': () => const KelolaOrangTuaPage(),
+  'Kelola Siswa': () => const KelolaSiswaPage(),
+  'Kelola Kelas': () => const KelolaKelasPage(),
+};
+
+const _keteranganMenu = {
+  'Kelola Guru': 'Akun & profil guru, NIP, status akun',
+  'Kelola Orang Tua': 'Akun & profil orang tua / wali murid',
+  'Kelola Siswa': 'Data siswa, kelas, dan orang tua',
+  'Kelola Kelas': 'Rombongan belajar & wali kelas',
+};
 
 class AdminMainPage extends StatefulWidget {
   const AdminMainPage({super.key});
@@ -40,7 +66,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
   @override
   Widget build(BuildContext context) {
     final halaman = switch (_tab) {
-      1 => const SegeraHadirPage(judul: 'Data', icon: Icons.dashboard_rounded),
+      1 => AdminDataPage(onBack: () => _keTab(0)),
       2 => const SegeraHadirPage(judul: 'Laporan', icon: Icons.summarize_rounded),
       3 => ProfilPage(nama: _nama, peran: 'Administrator', onBack: () => _keTab(0)),
       _ => _AdminDashboard(nama: _nama, onKeTab: _keTab),
@@ -90,28 +116,31 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     try {
       final res = await AppRepository.getDashboard();
       if (res.isSuccess && res.data != null && mounted) {
-        final d = res.data!;
-        final u = d['total_user'] ?? 0;
-        final s = d['total_siswa'] ?? 0;
+        final d = res.data!['statistik'] is Map ? res.data!['statistik'] as Map : res.data!;
         final g = d['total_guru'] ?? 0;
+        final o = d['total_orang_tua'] ?? 0;
+        final s = d['total_siswa'] ?? 0;
+        final k = d['total_kelas'] ?? 0;
         setState(() {
-          _keteranganStatus = '$u Akun Pengguna · $g Guru · $s Siswa terdaftar.';
+          _keteranganStatus = '$g Guru · $o Orang Tua · $s Siswa · $k Kelas terdaftar.';
         });
       }
     } catch (_) {}
   }
 
-  void _buka(BuildContext context, String judul, IconData icon) {
-    bukaHalaman(context, SegeraHadirPage(judul: judul, icon: icon));
+  Future<void> _buka(BuildContext context, String judul, IconData icon) async {
+    final halaman = halamanKelolaData[judul];
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => halaman?.call() ?? SegeraHadirPage(judul: judul, icon: icon)),
+    );
+    // Statistik diperbarui setelah kembali dari halaman kelola data
+    if (mounted) _fetchDashboard();
   }
 
   @override
   Widget build(BuildContext context) {
     const menu = [
-      (Icons.person_rounded, 'Kelola Guru'),
-      (Icons.groups_rounded, 'Kelola Orang Tua'),
-      (Icons.school_rounded, 'Kelola Siswa'),
-      (Icons.diversity_3_rounded, 'Kelola Kelas'),
+      ...menuKelolaData,
       (Icons.edit_note_rounded, 'Laporan'),
       (Icons.settings_rounded, 'Pengaturan'),
     ];
@@ -184,6 +213,50 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Tab "Data": pintu masuk ke empat fitur kelola data Admin
+class AdminDataPage extends StatelessWidget {
+  final VoidCallback? onBack;
+
+  const AdminDataPage({super.key, this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: JudulAppBar(judul: 'Kelola Data', onBack: onBack),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          ListCard(
+            children: [
+              for (final (icon, label) in menuKelolaData)
+                // Material transparan agar efek sentuh ListTile tetap terlihat di kartu putih
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.primaryLight,
+                      child: Icon(icon, color: AppColors.primary),
+                    ),
+                    title: Text(
+                      label,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                    ),
+                    subtitle: Text(
+                      _keteranganMenu[label] ?? '',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.textGrey),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textGrey),
+                    onTap: () => bukaHalaman(context, halamanKelolaData[label]!()),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

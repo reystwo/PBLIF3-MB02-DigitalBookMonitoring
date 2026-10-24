@@ -1,22 +1,39 @@
 // =============================================================
-// TAMBAH CATATAN - guru menulis catatan untuk seorang siswa
+// TAMBAH CATATAN - guru menulis catatan untuk siswa tanggung jawabnya
+// Pengirim ditentukan backend dari akun login; input dipertahankan
+// bila penyimpanan gagal agar dapat diperbaiki lalu disimpan ulang.
 // =============================================================
 import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/data/dummy_data.dart';
+import 'package:digital_book_connect/models/catatan_model.dart';
+import 'package:digital_book_connect/services/api_service.dart';
+import 'package:digital_book_connect/services/guru_repository.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
-import 'package:digital_book_connect/services/app_repository.dart';
+import 'package:digital_book_connect/screens/admin/admin_widgets.dart';
+
+typedef KirimCatatan = Future<ApiResponse<CatatanModel>> Function({
+  required int idSiswa,
+  required String isi,
+  String? kategori,
+  DateTime? tanggal,
+  String? lampiranNama,
+  String? lampiranUkuran,
+});
 
 class TambahCatatanPage extends StatefulWidget {
   final Siswa siswa;
+  // Dapat diganti saat pengujian
+  final KirimCatatan? kirim;
 
-  const TambahCatatanPage({super.key, required this.siswa});
+  const TambahCatatanPage({super.key, required this.siswa, this.kirim});
 
   @override
   State<TambahCatatanPage> createState() => _TambahCatatanPageState();
 }
 
 class _TambahCatatanPageState extends State<TambahCatatanPage> {
+  // Sama dengan batas backend (CatatanPenghubung::MAKS_ISI)
   static const _maksKarakter = 500;
 
   final _formKey = GlobalKey<FormState>();
@@ -25,6 +42,7 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
   DateTime _tanggal = DateTime.now();
   Lampiran? _lampiran;
   bool _isSaving = false;
+  Map<String, String> _errorServer = {};
 
   @override
   void dispose() {
@@ -39,7 +57,12 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (hasil != null) setState(() => _tanggal = hasil);
+    if (hasil != null) {
+      setState(() {
+        _tanggal = hasil;
+        _errorServer.remove('tanggal');
+      });
+    }
   }
 
   // Sementara: simulasi memilih file (belum memakai package file_picker)
@@ -51,50 +74,46 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
     });
   }
 
+  String? _validasiIsi(String? nilai) {
+    final isi = nilai?.trim() ?? '';
+    if (isi.isEmpty) return 'Isi catatan wajib diisi dan tidak boleh hanya berisi spasi.';
+    if (isi.length > _maksKarakter) return 'Isi catatan maksimal $_maksKarakter karakter.';
+    return null;
+  }
+
   Future<void> _simpan() async {
+    setState(() => _errorServer = {});
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    setState(() => _isSaving = true);
-    final isi = _isiController.text.trim();
+    final idSiswa = widget.siswa.idSiswa;
+    if (idSiswa == null || idSiswa <= 0) {
+      tampilkanPesan(context, 'Data siswa tidak valid. Muat ulang daftar siswa lalu coba lagi.', gagal: true);
+      return;
+    }
 
-    final res = await AppRepository.createCatatan(
-      idSiswa: widget.siswa.idSiswa ?? 1,
-      isi: isi,
+    setState(() => _isSaving = true);
+    final kirim = widget.kirim ?? GuruRepository.tambahCatatan;
+    final res = await kirim(
+      idSiswa: idSiswa,
+      isi: _isiController.text.trim(),
       kategori: _kategori,
       tanggal: _tanggal,
       lampiranNama: _lampiran?.namaFile,
       lampiranUkuran: _lampiran?.ukuran,
     );
 
-    // Update list catatan lokal sebagai fallback
-    daftarCatatan.insert(
-      0,
-      res.isSuccess && res.data != null
-          ? Catatan.fromModel(res.data!)
-          : Catatan(
-              idCatatan: DateTime.now().millisecondsSinceEpoch,
-              penulis: 'Bapak Ahmad',
-              peranPenulis: 'Guru Kelas 5A',
-              siswa: widget.siswa,
-              kategori: _kategori,
-              tanggal: _tanggal,
-              isi: isi,
-              lampiran: _lampiran,
-            ),
-    );
-
     if (!mounted) return;
-    setState(() => _isSaving = false);
+    setState(() {
+      _isSaving = false;
+      _errorServer = errorPerField(res);
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(res.isSuccess
-            ? 'Catatan untuk ${widget.siswa.nama} berhasil disimpan'
-            : 'Catatan disimpan secara lokal: ${res.message}'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-    Navigator.of(context).pop();
+    if (res.isSuccess) {
+      tampilkanPesan(context, res.message.isNotEmpty ? res.message : 'Catatan untuk ${widget.siswa.nama} berhasil disimpan');
+      Navigator.of(context).pop(true);
+    } else {
+      tampilkanPesan(context, 'Catatan gagal disimpan. ${res.message}', gagal: true);
+    }
   }
 
   @override
@@ -107,57 +126,38 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             // Info siswa
-            Container(
-              decoration: kartuDecoration(),
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  AppAvatar(radius: 26, perempuan: widget.siswa.perempuan),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.siswa.nama,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Kelas ${widget.siswa.kelas}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textGrey),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            DetailHeader(
+              leading: AppAvatar(radius: 26, perempuan: widget.siswa.perempuan),
+              judul: widget.siswa.nama,
+              subjudul: 'Kelas ${widget.siswa.kelas}',
             ),
             const SizedBox(height: 20),
 
             // Kategori
-            const _Label('Kategori'),
+            const FormLabel('Kategori'),
             DropdownButtonFormField<String>(
               initialValue: _kategori,
-              decoration: _inputDecoration(),
+              decoration: adminInputDecoration(errorText: _errorServer['kategori']),
               icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textGrey),
               style: const TextStyle(fontSize: 14, color: AppColors.textDark),
               items: [
                 for (final k in kategoriCatatan) DropdownMenuItem(value: k, child: Text(k)),
               ],
-              onChanged: (v) => setState(() => _kategori = v ?? _kategori),
+              onChanged: (v) => setState(() {
+                _kategori = v ?? _kategori;
+                _errorServer.remove('kategori');
+              }),
             ),
             const SizedBox(height: 16),
 
             // Tanggal
-            const _Label('Tanggal'),
+            const FormLabel('Tanggal'),
             InkWell(
               onTap: _pilihTanggal,
               borderRadius: BorderRadius.circular(10),
               child: InputDecorator(
-                decoration: _inputDecoration().copyWith(
+                decoration: adminInputDecoration(
+                  errorText: _errorServer['tanggal'],
                   suffixIcon: const Icon(Icons.calendar_month_outlined, color: AppColors.textGrey),
                 ),
                 child: Text(
@@ -169,20 +169,27 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
             const SizedBox(height: 16),
 
             // Isi catatan
-            const _Label('Catatan'),
+            const FormLabel('Isi Catatan', wajib: true),
             TextFormField(
+              key: const Key('isi-catatan'),
               controller: _isiController,
               maxLines: 5,
               maxLength: _maksKarakter,
+              textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(fontSize: 14),
-              decoration: _inputDecoration().copyWith(hintText: 'Tulis catatan di sini...'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Catatan tidak boleh kosong' : null,
+              decoration: adminInputDecoration(
+                hint: 'Tulis catatan di sini...',
+                errorText: _errorServer['isi_catatan'],
+              ),
+              onChanged: (_) {
+                if (_errorServer.containsKey('isi_catatan')) setState(() => _errorServer.remove('isi_catatan'));
+              },
+              validator: _validasiIsi,
             ),
             const SizedBox(height: 8),
 
             // Lampiran
-            const _Label('Lampiran (opsional)'),
+            const FormLabel('Lampiran (opsional)'),
             _KotakLampiran(lampiran: _lampiran, onTap: _pilihLampiran),
             const SizedBox(height: 28),
 
@@ -191,43 +198,6 @@ class _TambahCatatanPageState extends State<TambahCatatanPage> {
               onPressed: _isSaving ? null : _simpan,
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration() {
-    OutlineInputBorder garis(Color c, [double w = 1]) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: c, width: w),
-        );
-    return InputDecoration(
-      filled: true,
-      fillColor: Colors.white,
-      hintStyle: const TextStyle(color: AppColors.textGrey, fontSize: 13),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: garis(AppColors.divider),
-      enabledBorder: garis(AppColors.divider),
-      focusedBorder: garis(AppColors.primary, 1.5),
-    );
-  }
-}
-
-class _Label extends StatelessWidget {
-  final String teks;
-
-  const _Label(this.teks);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        teks,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textDark,
         ),
       ),
     );

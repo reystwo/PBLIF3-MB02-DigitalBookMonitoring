@@ -34,4 +34,14 @@ class Guru extends Model
     {
         return $this->hasMany(Kelas::class, 'id_wali_guru', 'id_guru');
     }
+
+    /**
+     * Apakah siswa berada di kelas yang diampu guru ini (cek langsung ke database).
+     */
+    public function bertanggungJawabAtas(Siswa $siswa): bool
+    {
+        return Kelas::whereKey($siswa->id_kelas)
+            ->where('id_wali_guru', $this->id_guru)
+            ->exists();
+    }
 }
