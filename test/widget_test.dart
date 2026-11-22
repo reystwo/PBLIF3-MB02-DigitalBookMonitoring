@@ -59,12 +59,12 @@ void main() {
         'nis': '1002',
         'nama': 'Aisyah Putri',
         'jenis_kelamin': 'P',
-        'kelas': '5A',
+        'kelas': '7A',
       };
       final siswaP = Siswa.fromJson(jsonPerempuan);
       expect(siswaP.idSiswa, equals(2));
       expect(siswaP.nama, equals('Aisyah Putri'));
-      expect(siswaP.kelas, equals('5A'));
+      expect(siswaP.kelas, equals('7A'));
       expect(siswaP.perempuan, isTrue, reason: 'jenis_kelamin P harus menghasilkan perempuan == true');
 
       final jsonLaki = {
@@ -72,7 +72,7 @@ void main() {
         'nis': '1001',
         'nama': 'Ahmad Rizki',
         'jenis_kelamin': 'L',
-        'kelas': '5A',
+        'kelas': '7A',
       };
       final siswaL = Siswa.fromJson(jsonLaki);
       expect(siswaL.idSiswa, equals(1));
@@ -87,7 +87,7 @@ void main() {
         'id_pengirim': 2,
         'id_penerima': 4,
         'penulis': 'Bapak Ahmad',
-        'peran_penulis': 'Guru Kelas 5A',
+        'peran_penulis': 'Guru Kelas 7A',
         'penulis_perempuan': false,
         'kategori': 'Perilaku',
         'isi': 'Ahmad Rizki sangat sopan dan membantu teman di kelas.',
@@ -97,7 +97,7 @@ void main() {
         'siswa': {
           'id_siswa': 1,
           'nama': 'Ahmad Rizki',
-          'kelas': '5A',
+          'kelas': '7A',
           'jenis_kelamin': 'L',
           'perempuan': false,
         },
@@ -110,11 +110,11 @@ void main() {
       final catatan = Catatan.fromJson(jsonCatatan);
       expect(catatan.idCatatan, equals(15));
       expect(catatan.penulis, equals('Bapak Ahmad'));
-      expect(catatan.peranPenulis, equals('Guru Kelas 5A'));
+      expect(catatan.peranPenulis, equals('Guru Kelas 7A'));
       expect(catatan.kategori, equals('Perilaku'));
       expect(catatan.isi, equals('Ahmad Rizki sangat sopan dan membantu teman di kelas.'));
       expect(catatan.siswa.nama, equals('Ahmad Rizki'));
-      expect(catatan.siswa.kelas, equals('5A'));
+      expect(catatan.siswa.kelas, equals('7A'));
       expect(catatan.lampiran, isNotNull);
       expect(catatan.lampiran?.namaFile, equals('foto_kegiatan.jpg'));
       expect(catatan.lampiran?.ukuran, equals('850 KB'));

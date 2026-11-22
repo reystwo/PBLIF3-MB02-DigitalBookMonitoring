@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 /**
  * Fitur Guru: siswa tanggung jawab (wali kelas), detail, riwayat & tambah catatan.
- * Seeder: Bapak Ahmad (guru) = wali 5A, Ibu Nurul (guru_nurul) = wali 5B.
+ * Seeder: Bapak Ahmad (guru) = wali 7A, Ibu Nurul (guru_nurul) = wali 7B.
  */
 class GuruSiswaCatatanApiTest extends TestCase
 {
@@ -118,7 +118,7 @@ class GuruSiswaCatatanApiTest extends TestCase
         $this->sebagai('guru')->getJson("/api/guru/siswa/{$siswa->id_siswa}")
             ->assertOk()
             ->assertJsonPath('data.nama', 'Ahmad Rizki')
-            ->assertJsonPath('data.kelas', '5A')
+            ->assertJsonPath('data.kelas', '7A')
             ->assertJsonPath('data.wali_kelas', 'Bapak Ahmad')
             ->assertJsonPath('data.jumlah_catatan', 2)
             ->assertJsonPath('data.orang_tua.0.nama', 'Ibu Siti Nurhaliza')
@@ -127,7 +127,7 @@ class GuruSiswaCatatanApiTest extends TestCase
 
     public function test_detail_dan_riwayat_siswa_kelas_lain_ditolak_403(): void
     {
-        $citra = $this->siswa('Citra Lestari'); // kelas 5B
+        $citra = $this->siswa('Citra Lestari'); // kelas 7B
 
         $this->sebagai('guru')->getJson("/api/guru/siswa/{$citra->id_siswa}")
             ->assertForbidden()
@@ -167,7 +167,7 @@ class GuruSiswaCatatanApiTest extends TestCase
             ->assertJsonPath('meta.total', 3)
             ->assertJsonPath('data.0.id_catatan', $terbaru->id_catatan)
             ->assertJsonPath('data.0.penulis', 'Bapak Ahmad')
-            ->assertJsonPath('data.0.peran_penulis', 'Guru Kelas 5A')
+            ->assertJsonPath('data.0.peran_penulis', 'Guru Kelas 7A')
             ->assertJsonPath('data.0.created_at', '2030-01-15 10:00:00')
             // Catatan seeder: balasan orang tua (10 Sep) dibuat sebelum catatan guru (12 Sep)
             ->assertJsonPath('data.1.isi', 'Ananda Rizki menunjukkan peningkatan pada mata pelajaran Matematika. Namun, perlu lebih fokus dalam mengerjakan tugas rumah. Tetap semangat!')
@@ -189,7 +189,9 @@ class GuruSiswaCatatanApiTest extends TestCase
         $siswa = $this->siswa('Ahmad Rizki');
 
         // Kembali ke skema sebelum migration timestamp, lalu simpan "data lama"
-        $this->artisan('migrate:rollback', ['--step' => 1])->assertSuccessful();
+        $this->artisan('migrate:rollback', [
+            '--path' => 'database/migrations/2026_10_24_000000_add_timestamps_to_catatan_penghubung_table.php',
+        ])->assertSuccessful();
         $this->assertFalse(Schema::hasColumn('catatan_penghubung', 'created_at'));
         $jumlahLama = DB::table('catatan_penghubung')->count();
 
@@ -250,8 +252,8 @@ class GuruSiswaCatatanApiTest extends TestCase
 
     public function test_manipulasi_identitas_pengirim_dan_siswa_pada_body_diabaikan(): void
     {
-        $budi = $this->siswa('Budi Santoso');     // 5A, tanggung jawab Bapak Ahmad
-        $citra = $this->siswa('Citra Lestari');   // 5B
+        $budi = $this->siswa('Budi Santoso');     // 7A, tanggung jawab Bapak Ahmad
+        $citra = $this->siswa('Citra Lestari');   // 7B
         $idNurul = $this->idUser('guru_nurul');
 
         $res = $this->sebagai('guru')->postJson("/api/guru/siswa/{$budi->id_siswa}/catatan", [
@@ -384,7 +386,7 @@ class GuruSiswaCatatanApiTest extends TestCase
 
     // ==================== ENDPOINT LAMA (/api/siswa & /api/catatan) ====================
 
-    private function catatanSiswa5B(): CatatanPenghubung
+    private function catatanSiswa7B(): CatatanPenghubung
     {
         return CatatanPenghubung::create([
             'id_siswa' => $this->siswa('Citra Lestari')->id_siswa,
@@ -392,35 +394,35 @@ class GuruSiswaCatatanApiTest extends TestCase
             'id_penerima' => $this->idUser('ortu_citra'),
             'kategori' => 'Akademik',
             'tanggal' => now(),
-            'isi_catatan' => 'Catatan wali kelas 5B',
+            'isi_catatan' => 'Catatan wali kelas 7B',
         ]);
     }
 
     public function test_endpoint_catatan_lama_menolak_guru_di_luar_cakupan(): void
     {
-        $catatan5B = $this->catatanSiswa5B();
+        $catatan7B = $this->catatanSiswa7B();
         $citra = $this->siswa('Citra Lestari');
 
         $this->sebagai('guru')->postJson('/api/catatan', ['id_siswa' => $citra->id_siswa, 'isi_catatan' => 'Lewat endpoint lama'])
             ->assertForbidden();
 
-        $this->sebagai('guru')->getJson("/api/catatan/{$catatan5B->id_catatan}")->assertForbidden();
-        $this->sebagai('guru')->postJson("/api/catatan/{$catatan5B->id_catatan}/balas", ['isi_catatan' => 'Balas'])->assertForbidden();
-        $this->sebagai('guru')->patchJson("/api/catatan/{$catatan5B->id_catatan}/baca")->assertForbidden();
+        $this->sebagai('guru')->getJson("/api/catatan/{$catatan7B->id_catatan}")->assertForbidden();
+        $this->sebagai('guru')->postJson("/api/catatan/{$catatan7B->id_catatan}/balas", ['isi_catatan' => 'Balas'])->assertForbidden();
+        $this->sebagai('guru')->patchJson("/api/catatan/{$catatan7B->id_catatan}/baca")->assertForbidden();
 
         $idCatatanDiDaftar = array_column($this->sebagai('guru')->getJson('/api/catatan')->json('data'), 'id_catatan');
-        $this->assertNotContains($catatan5B->id_catatan, $idCatatanDiDaftar);
+        $this->assertNotContains($catatan7B->id_catatan, $idCatatanDiDaftar);
 
         $this->sebagai('guru')->getJson("/api/catatan?id_siswa={$citra->id_siswa}")
             ->assertOk()
             ->assertJsonCount(0, 'data');
 
-        $this->assertSame('belum_dibaca', $catatan5B->fresh()->status_dibaca);
+        $this->assertSame('belum_dibaca', $catatan7B->fresh()->status_dibaca);
         $this->assertSame(1, CatatanPenghubung::where('id_siswa', $citra->id_siswa)->count());
 
-        // Wali kelas 5B tetap dapat membaca & membalas catatan siswanya
-        $this->sebagai('guru_nurul')->getJson("/api/catatan/{$catatan5B->id_catatan}")->assertOk();
-        $this->sebagai('guru_nurul')->postJson("/api/catatan/{$catatan5B->id_catatan}/balas", ['isi_catatan' => 'Tambahan'])
+        // Wali kelas 7B tetap dapat membaca & membalas catatan siswanya
+        $this->sebagai('guru_nurul')->getJson("/api/catatan/{$catatan7B->id_catatan}")->assertOk();
+        $this->sebagai('guru_nurul')->postJson("/api/catatan/{$catatan7B->id_catatan}/balas", ['isi_catatan' => 'Tambahan'])
             ->assertCreated();
     }
 
@@ -457,10 +459,10 @@ class GuruSiswaCatatanApiTest extends TestCase
         $this->sebagai('admin')->getJson('/api/siswa')->assertOk()->assertJsonCount(7, 'data');
 
         // Orang tua tetap melihat & membaca catatan anaknya
-        $catatan5B = $this->catatanSiswa5B();
-        $this->sebagai('ortu_citra')->getJson("/api/catatan/{$catatan5B->id_catatan}")
+        $catatan7B = $this->catatanSiswa7B();
+        $this->sebagai('ortu_citra')->getJson("/api/catatan/{$catatan7B->id_catatan}")
             ->assertOk()
             ->assertJsonPath('data.status_dibaca', 'dibaca');
-        $this->sebagai('ortu_citra')->patchJson("/api/catatan/{$catatan5B->id_catatan}/baca")->assertOk();
+        $this->sebagai('ortu_citra')->patchJson("/api/catatan/{$catatan7B->id_catatan}/baca")->assertOk();
     }
 }

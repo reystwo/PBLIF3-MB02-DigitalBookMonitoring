@@ -40,7 +40,7 @@ class CatatanDanSiswaApiTest extends TestCase
      */
     public function test_guru_only_gets_siswa_of_their_kelas_and_filter_by_kelas(): void
     {
-        // 1. Bapak Ahmad (wali 5A) hanya melihat 4 siswa kelas 5A dari total 7 siswa
+        // 1. Bapak Ahmad (wali 7A) hanya melihat 4 siswa kelas 7A dari total 7 siswa
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->guruToken)
             ->getJson('/api/siswa');
 
@@ -51,14 +51,14 @@ class CatatanDanSiswaApiTest extends TestCase
             ->assertJsonCount(4, 'data');
 
         foreach ($response->json('data') as $s) {
-            $this->assertEquals('5A', $s['kelas']);
+            $this->assertEquals('7A', $s['kelas']);
         }
 
-        // 2. Filter ke kelas lain (5B) tidak membuka akses ke siswa di luar tanggung jawabnya
-        $response5B = $this->withHeader('Authorization', 'Bearer ' . $this->guruToken)
-            ->getJson('/api/siswa?kelas=5B');
+        // 2. Filter ke kelas lain (7B) tidak membuka akses ke siswa di luar tanggung jawabnya
+        $response7B = $this->withHeader('Authorization', 'Bearer ' . $this->guruToken)
+            ->getJson('/api/siswa?kelas=7B');
 
-        $response5B->assertStatus(200)->assertJsonCount(0, 'data');
+        $response7B->assertStatus(200)->assertJsonCount(0, 'data');
     }
 
     /**

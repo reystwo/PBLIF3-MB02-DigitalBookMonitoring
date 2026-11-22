@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CatatanPenghubung;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -68,13 +69,59 @@ abstract class AdminController extends Controller
     }
 
     /**
+     * Query catatan penghubung yang dikirim atau diterima oleh akun.
+     */
+    protected function catatanUser(int $idUser): Builder
+    {
+        return CatatanPenghubung::where(function (Builder $q) use ($idUser) {
+            $q->where('id_pengirim', $idUser)->orWhere('id_penerima', $idUser);
+        });
+    }
+
+    /**
      * Jumlah catatan penghubung yang dikirim atau diterima oleh akun.
      */
     protected function jumlahCatatanUser(int $idUser): int
     {
-        return CatatanPenghubung::where('id_pengirim', $idUser)
-            ->orWhere('id_penerima', $idUser)
-            ->count();
+        return $this->catatanUser($idUser)->count();
+    }
+
+    /**
+     * Penghapusan paksa data yang memiliki catatan penghubung.
+     * Admin wajib mengonfirmasi lewat ?hapus_catatan=<jumlah>, dan jumlah itu harus
+     * sama dengan jumlah catatan saat ini. Bila belum/tidak sesuai (mis. ada catatan
+     * baru sejak halaman dibuka) -> 409 beserta jumlah terbaru untuk dikonfirmasi ulang.
+     * Mengembalikan null bila penghapusan boleh dilanjutkan.
+     */
+    protected function tolakJikaCatatanBelumDikonfirmasi(Request $request, int $jumlahCatatan, string $label): ?JsonResponse
+    {
+        if ($jumlahCatatan === 0) {
+            return null;
+        }
+
+        $dikonfirmasi = filter_var($request->query('hapus_catatan'), FILTER_VALIDATE_INT);
+        if ($dikonfirmasi === $jumlahCatatan) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => "{$label} memiliki {$jumlahCatatan} catatan penghubung yang akan ikut terhapus permanen. Konfirmasi penghapusan untuk melanjutkan.",
+            'data' => [
+                'jumlah_catatan' => $jumlahCatatan,
+                'perlu_konfirmasi_catatan' => true,
+            ],
+        ], 409);
+    }
+
+    /**
+     * Pesan sukses hapus, menyebut catatan yang ikut terhapus bila ada.
+     */
+    protected function pesanTerhapus(string $label, int $jumlahCatatan): string
+    {
+        return $jumlahCatatan > 0
+            ? "{$label} berhasil dihapus beserta {$jumlahCatatan} catatan penghubung"
+            : "{$label} berhasil dihapus";
     }
 
     /**

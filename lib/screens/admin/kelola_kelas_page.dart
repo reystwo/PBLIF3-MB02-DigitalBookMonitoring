@@ -47,7 +47,7 @@ class DetailKelasPage extends StatelessWidget {
       judul: 'Detail Kelas',
       judulHapus: 'Hapus Kelas',
       muat: () => AdminRepository.getDetailKelas(idKelas),
-      hapus: (k) => AdminRepository.hapusKelas(k.idKelas),
+      hapus: (k, _) => AdminRepository.hapusKelas(k.idKelas),
       pesanKonfirmasiHapus: (k) => 'Hapus kelas ${k.namaKelas} (${k.tahunAjaran})? Tindakan ini tidak dapat dibatalkan.',
       bukaEdit: (context, k) =>
           Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => FormKelasPage(kelas: k))),
@@ -82,15 +82,72 @@ class DetailKelasPage extends StatelessWidget {
             children: [
               for (final s in k.siswa)
                 ListItemTile(
+                  key: ValueKey('siswa-kelas-${s.idSiswa}'),
                   judul: Text(s.nama),
                   subjudul: 'NIS ${s.nis}',
                   perempuan: s.perempuan,
+                  trailing: _TombolKeluarkanSiswa(kelas: k, siswa: s),
                   onTap: () => Navigator.of(context)
                       .push(MaterialPageRoute(builder: (_) => DetailSiswaPage(idSiswa: s.idSiswa))),
                 ),
             ],
           ),
       ],
+    );
+  }
+}
+
+/// Tombol hapus pada baris daftar siswa di Detail Kelas.
+/// Hanya mengeluarkan siswa dari kelas ini; akun, profil, relasi orang tua,
+/// dan catatan penghubung siswa tetap tersimpan.
+class _TombolKeluarkanSiswa extends StatefulWidget {
+  final KelasAdmin kelas;
+  final SiswaRingkas siswa;
+
+  const _TombolKeluarkanSiswa({required this.kelas, required this.siswa});
+
+  @override
+  State<_TombolKeluarkanSiswa> createState() => _TombolKeluarkanSiswaState();
+}
+
+class _TombolKeluarkanSiswaState extends State<_TombolKeluarkanSiswa> {
+  bool _memproses = false;
+
+  Future<void> _keluarkan() async {
+    final k = widget.kelas;
+    final s = widget.siswa;
+    final setuju = await konfirmasiHapus(
+      context,
+      judul: 'Hapus Siswa dari Kelas',
+      pesan: 'Keluarkan ${s.nama} (NIS ${s.nis}) dari kelas ${k.namaKelas}? '
+          'Data siswa, orang tua, dan catatan penghubung tetap tersimpan. '
+          'Siswa dapat ditempatkan kembali melalui menu Kelola Siswa.',
+    );
+    if (!setuju || !mounted) return;
+
+    setState(() => _memproses = true);
+    final res = await AdminRepository.keluarkanSiswaDariKelas(k.idKelas, s.idSiswa);
+    if (!mounted) return;
+    setState(() => _memproses = false);
+
+    tampilkanPesan(context, res.message, gagal: !res.isSuccess);
+    // 404: siswa sudah tidak terdaftar di kelas ini -> segarkan juga agar daftar sesuai server
+    if (res.isSuccess || res.statusCode == 404) await AdminDetailPage.muatUlang(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_memproses) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    return IconButton(
+      key: ValueKey('hapus-siswa-kelas-${widget.siswa.idSiswa}'),
+      tooltip: 'Hapus dari kelas',
+      onPressed: _keluarkan,
+      icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
     );
   }
 }
@@ -202,7 +259,7 @@ class _FormKelasPageState extends State<FormKelasPage> {
               label: 'Nama Kelas',
               wajib: true,
               controller: _namaKelas,
-              hint: 'Contoh: 5A',
+              hint: 'Contoh: 7A',
               textCapitalization: TextCapitalization.characters,
               maxLength: 50,
               errorServer: _errorServer['nama_kelas'],

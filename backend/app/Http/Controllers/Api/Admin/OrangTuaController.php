@@ -106,7 +106,7 @@ class OrangTuaController extends AdminController
         ], 200);
     }
 
-    public function destroy(OrangTua $orangTua): JsonResponse
+    public function destroy(Request $request, OrangTua $orangTua): JsonResponse
     {
         $orangTua->load(['user', 'siswa']);
         $nama = $orangTua->user?->nama ?? 'ini';
@@ -117,13 +117,15 @@ class OrangTuaController extends AdminController
             return $this->conflict("Orang tua {$nama} masih terhubung dengan siswa: {$daftarAnak}. Lepaskan hubungan tersebut terlebih dahulu melalui menu Kelola Siswa.");
         }
 
+        // Catatan yang dikirim/diterima orang tua ikut terhapus permanen -> wajib dikonfirmasi Admin
         $jumlahCatatan = $this->jumlahCatatanUser($orangTua->id_user);
-        if ($jumlahCatatan > 0) {
-            return $this->conflict("Orang tua {$nama} memiliki {$jumlahCatatan} catatan penghubung. Data tidak dapat dihapus agar riwayat catatan tetap utuh; nonaktifkan akun sebagai gantinya.");
+        if ($tolak = $this->tolakJikaCatatanBelumDikonfirmasi($request, $jumlahCatatan, "Orang tua {$nama}")) {
+            return $tolak;
         }
 
         try {
             DB::transaction(function () use ($orangTua) {
+                $this->catatanUser($orangTua->id_user)->delete();
                 $user = $orangTua->user;
                 $orangTua->delete();
                 if ($user) {
@@ -137,7 +139,7 @@ class OrangTuaController extends AdminController
 
         return response()->json([
             'success' => true,
-            'message' => "Orang tua {$nama} berhasil dihapus",
+            'message' => $this->pesanTerhapus("Orang tua {$nama}", $jumlahCatatan),
         ], 200);
     }
 

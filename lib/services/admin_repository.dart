@@ -20,7 +20,9 @@ class AdminRepository {
         GuruAdmin.fromJson,
       );
 
-  static Future<ApiResponse<void>> hapusGuru(int idGuru) => _hapus('/admin/guru/$idGuru');
+  /// [hapusCatatan]: jumlah catatan penghubung yang dikonfirmasi Admin untuk ikut terhapus.
+  static Future<ApiResponse<int>> hapusGuru(int idGuru, {int hapusCatatan = 0}) =>
+      _hapus('/admin/guru/$idGuru', hapusCatatan: hapusCatatan);
 
   // ==================== ORANG TUA ====================
 
@@ -38,7 +40,9 @@ class AdminRepository {
         OrangTuaAdmin.fromJson,
       );
 
-  static Future<ApiResponse<void>> hapusOrangTua(int idOrangTua) => _hapus('/admin/orang-tua/$idOrangTua');
+  /// [hapusCatatan]: jumlah catatan penghubung yang dikonfirmasi Admin untuk ikut terhapus.
+  static Future<ApiResponse<int>> hapusOrangTua(int idOrangTua, {int hapusCatatan = 0}) =>
+      _hapus('/admin/orang-tua/$idOrangTua', hapusCatatan: hapusCatatan);
 
   // ==================== SISWA ====================
 
@@ -61,7 +65,9 @@ class AdminRepository {
         SiswaAdmin.fromJson,
       );
 
-  static Future<ApiResponse<void>> hapusSiswa(int idSiswa) => _hapus('/admin/siswa/$idSiswa');
+  /// [hapusCatatan]: jumlah catatan penghubung yang dikonfirmasi Admin untuk ikut terhapus.
+  static Future<ApiResponse<int>> hapusSiswa(int idSiswa, {int hapusCatatan = 0}) =>
+      _hapus('/admin/siswa/$idSiswa', hapusCatatan: hapusCatatan);
 
   // ==================== KELAS ====================
 
@@ -78,7 +84,11 @@ class AdminRepository {
         KelasAdmin.fromJson,
       );
 
-  static Future<ApiResponse<void>> hapusKelas(int idKelas) => _hapus('/admin/kelas/$idKelas');
+  static Future<ApiResponse<int>> hapusKelas(int idKelas) => _hapus('/admin/kelas/$idKelas');
+
+  /// Keluarkan siswa dari kelas: hanya melepas relasi kelas, data siswa tetap ada.
+  static Future<ApiResponse<int>> keluarkanSiswaDariKelas(int idKelas, int idSiswa) =>
+      _hapus('/admin/kelas/$idKelas/siswa/$idSiswa');
 
   // ==================== HELPER ====================
 
@@ -122,8 +132,14 @@ class AdminRepository {
     return ApiResponse(success: false, message: res.message, statusCode: res.statusCode, errors: res.errors);
   }
 
-  static Future<ApiResponse<void>> _hapus(String endpoint) async {
-    final res = await ApiService.delete(endpoint);
-    return ApiResponse(success: res.success, message: res.message, statusCode: res.statusCode);
+  /// DELETE endpoint. `data` hasil berisi jumlah catatan penghubung terbaru bila
+  /// backend meminta konfirmasi penghapusan catatan (409), selain itu null.
+  static Future<ApiResponse<int>> _hapus(String endpoint, {int hapusCatatan = 0}) async {
+    final res = await ApiService.delete(hapusCatatan > 0 ? '$endpoint?hapus_catatan=$hapusCatatan' : endpoint);
+    final data = res.data;
+    final jumlahCatatan = (data is Map && data['perlu_konfirmasi_catatan'] == true)
+        ? int.tryParse('${data['jumlah_catatan']}')
+        : null;
+    return ApiResponse(success: res.success, message: res.message, statusCode: res.statusCode, data: jumlahCatatan);
   }
 }

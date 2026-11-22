@@ -46,7 +46,8 @@ class DetailGuruPage extends StatelessWidget {
       judul: 'Detail Guru',
       judulHapus: 'Hapus Guru',
       muat: () => AdminRepository.getDetailGuru(idGuru),
-      hapus: (g) => AdminRepository.hapusGuru(g.idGuru),
+      hapus: (g, hapusCatatan) => AdminRepository.hapusGuru(g.idGuru, hapusCatatan: hapusCatatan),
+      jumlahCatatan: (g) => g.jumlahCatatan,
       pesanKonfirmasiHapus: (g) =>
           'Hapus data guru ${g.nama}? Akun login guru ini juga akan dihapus dan tindakan ini tidak dapat dibatalkan.',
       bukaEdit: (context, g) =>

@@ -235,6 +235,9 @@ class SiswaAdmin {
     this.jumlahCatatan = 0,
   });
 
+  /// False bila siswa sudah dikeluarkan dari kelas (id_kelas null di backend).
+  bool get punyaKelas => idKelas > 0;
+
   factory SiswaAdmin.fromJson(Map<String, dynamic> json) {
     final jk = _str(json['jenis_kelamin']).isEmpty ? 'L' : _str(json['jenis_kelamin']);
     return SiswaAdmin(

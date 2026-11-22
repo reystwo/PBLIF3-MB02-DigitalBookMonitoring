@@ -34,6 +34,10 @@ class AdminAksesTest extends AdminApiTestCase
             $endpoint[] = ['GET', "/api/admin/{$resource}/999999"];
         }
 
+        // Keluarkan siswa dari kelas
+        $siswaDiKelas = Siswa::where('id_kelas', $kelas)->value('id_siswa');
+        $endpoint[] = ['DELETE', "/api/admin/kelas/{$kelas}/siswa/{$siswaDiKelas}"];
+
         return $endpoint;
     }
 
@@ -61,6 +65,7 @@ class AdminAksesTest extends AdminApiTestCase
         // Tidak ada data yang berubah atau terhapus
         $this->assertSame($jumlahUserAwal, User::count());
         $this->assertSame($jumlahSiswaAwal, Siswa::count());
+        $this->assertSame(0, Siswa::whereNull('id_kelas')->count());
         $this->assertDatabaseMissing('users', ['username' => 'coba_hack']);
     }
 

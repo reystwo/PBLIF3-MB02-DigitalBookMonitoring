@@ -63,7 +63,7 @@ class Lampiran {
 class Catatan {
   final int? idCatatan;
   final String penulis;
-  final String peranPenulis; // contoh: "Guru Kelas 5A" / "Orang Tua"
+  final String peranPenulis; // contoh: "Guru Kelas 7A" / "Orang Tua"
   final bool penulisPerempuan;
   final Siswa siswa;
   final String kategori;
@@ -137,7 +137,7 @@ class Aktivitas {
   }
 }
 
-const List<String> daftarKelas = ['5A', '5B'];
+const List<String> daftarKelas = ['7A', '7B'];
 
 const List<String> kategoriCatatan = [
   'Akademik',
@@ -148,19 +148,19 @@ const List<String> kategoriCatatan = [
 ];
 
 const List<Siswa> daftarSiswa = [
-  Siswa(nama: 'Ahmad Rizki', kelas: '5A'),
-  Siswa(nama: 'Aisyah Putri', kelas: '5A', perempuan: true),
-  Siswa(nama: 'Budi Santoso', kelas: '5A'),
-  Siswa(nama: 'Citra Lestari', kelas: '5B', perempuan: true),
-  Siswa(nama: 'Dani Pratama', kelas: '5B'),
-  Siswa(nama: 'Fajar Ramadhan', kelas: '5B'),
-  Siswa(nama: 'Siti Aisyah', kelas: '5A', perempuan: true),
+  Siswa(nama: 'Ahmad Rizki', kelas: '7A'),
+  Siswa(nama: 'Aisyah Putri', kelas: '7A', perempuan: true),
+  Siswa(nama: 'Budi Santoso', kelas: '7A'),
+  Siswa(nama: 'Citra Lestari', kelas: '7B', perempuan: true),
+  Siswa(nama: 'Dani Pratama', kelas: '7B'),
+  Siswa(nama: 'Fajar Ramadhan', kelas: '7B'),
+  Siswa(nama: 'Siti Aisyah', kelas: '7A', perempuan: true),
 ];
 
 final List<Catatan> daftarCatatan = [
   Catatan(
     penulis: 'Bapak Ahmad',
-    peranPenulis: 'Guru Kelas 5A',
+    peranPenulis: 'Guru Kelas 7A',
     siswa: daftarSiswa[0],
     kategori: 'Akademik',
     tanggal: DateTime(2025, 9, 12),
@@ -180,7 +180,7 @@ final List<Catatan> daftarCatatan = [
   ),
   Catatan(
     penulis: 'Bapak Ahmad',
-    peranPenulis: 'Guru Kelas 5A',
+    peranPenulis: 'Guru Kelas 7A',
     siswa: daftarSiswa[6],
     kategori: 'Perilaku',
     tanggal: DateTime(2025, 9, 8),

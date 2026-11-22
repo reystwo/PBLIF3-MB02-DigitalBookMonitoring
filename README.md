@@ -81,15 +81,15 @@ Seluruh akun di bawah ini telah disiapkan otomatis melalui seeder (`DatabaseSeed
 | Role | Username | Password | Nama Akun / Keterangan |
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin` | `password123` | Administrator Sekolah |
-| **Guru** | `guru` | `password123` | Bapak Ahmad, S.Pd (Wali Kelas 5A) |
-| **Guru** | `guru_nurul` | `password123` | Ibu Nurul Hidayah, S.Pd (Wali Kelas 5B) |
-| **Orang Tua** | `ortu` | `password123` | Ibu Siti Nurhaliza (Orang Tua dari Ahmad Rizki - 5A) |
-| **Orang Tua** | `ortu_aisyah` | `password123` | Ibu Rahmawati (Orang Tua dari Aisyah Putri - 5A) |
-| **Orang Tua** | `ortu_budi` | `password123` | Bapak Hendra (Orang Tua dari Budi Santoso - 5A) |
-| **Orang Tua** | `ortu_citra` | `password123` | Ibu Dewi Lestari (Orang Tua dari Citra Lestari - 5B) |
-| **Orang Tua** | `ortu_dani` | `password123` | Bapak Bambang (Orang Tua dari Dani Pratama - 5B) |
-| **Orang Tua** | `ortu_fajar` | `password123` | Bapak Joko (Orang Tua dari Fajar Ramadhan - 5B) |
-| **Orang Tua** | `ortu_siti` | `password123` | Ibu Fatimah (Orang Tua dari Siti Aisyah - 5A) |
+| **Guru** | `guru` | `password123` | Bapak Ahmad, S.Pd (Wali Kelas 7A) |
+| **Guru** | `guru_nurul` | `password123` | Ibu Nurul Hidayah, S.Pd (Wali Kelas 7B) |
+| **Orang Tua** | `ortu` | `password123` | Ibu Siti Nurhaliza (Orang Tua dari Ahmad Rizki - 7A) |
+| **Orang Tua** | `ortu_aisyah` | `password123` | Ibu Rahmawati (Orang Tua dari Aisyah Putri - 7A) |
+| **Orang Tua** | `ortu_budi` | `password123` | Bapak Hendra (Orang Tua dari Budi Santoso - 7A) |
+| **Orang Tua** | `ortu_citra` | `password123` | Ibu Dewi Lestari (Orang Tua dari Citra Lestari - 7B) |
+| **Orang Tua** | `ortu_dani` | `password123` | Bapak Bambang (Orang Tua dari Dani Pratama - 7B) |
+| **Orang Tua** | `ortu_fajar` | `password123` | Bapak Joko (Orang Tua dari Fajar Ramadhan - 7B) |
+| **Orang Tua** | `ortu_siti` | `password123` | Ibu Fatimah (Orang Tua dari Siti Aisyah - 7A) |
 
 ---
 
@@ -187,7 +187,7 @@ Seluruh endpoint terproteksi memerlukan header `Authorization: Bearer <token>` y
 | `GET` | `/api/dashboard` | Semua Role | Mengambil data dashboard spesifik role |
 | `GET` | `/api/notifikasi` | Semua Role | Mengambil riwayat feed aktivitas & notifikasi |
 | `GET` | `/api/kelas` | Guru / Admin | Mengambil daftar kelas dan wali kelas |
-| `GET` | `/api/siswa` | Guru / Admin | Mengambil daftar siswa (filter `?kelas=5A`); Guru hanya mendapat siswa di kelas yang ia ampu |
+| `GET` | `/api/siswa` | Guru / Admin | Mengambil daftar siswa (filter `?kelas=7A`); Guru hanya mendapat siswa di kelas yang ia ampu |
 | `GET` | `/api/catatan` | Guru / Ortu / Admin | Mengambil riwayat catatan penghubung |
 | `GET` | `/api/catatan/{id}` | Guru / Ortu / Admin | Detail catatan & otomatis tandai `'dibaca'` |
 | `POST` | `/api/catatan` | Guru / Admin | Mengirim catatan penghubung baru untuk siswa |

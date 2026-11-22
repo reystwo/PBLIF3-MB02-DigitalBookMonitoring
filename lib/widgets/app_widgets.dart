@@ -210,6 +210,8 @@ class ListItemTile extends StatelessWidget {
   final VoidCallback? onTap;
   // Pengganti avatar default (opsional), mis. ikon kelas
   final Widget? leading;
+  // Aksi tambahan di sisi kanan sebelum ikon panah (opsional), mis. tombol hapus
+  final Widget? trailing;
 
   const ListItemTile({
     super.key,
@@ -219,6 +221,7 @@ class ListItemTile extends StatelessWidget {
     this.perempuan = false,
     this.onTap,
     this.leading,
+    this.trailing,
   });
 
   @override
@@ -262,6 +265,7 @@ class ListItemTile extends StatelessWidget {
                 ],
               ),
             ),
+            ?trailing,
             const Icon(Icons.chevron_right_rounded, color: AppColors.textGrey),
           ],
         ),

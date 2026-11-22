@@ -35,7 +35,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'aktif',
         ]);
 
-        // B. Guru (Bapak Ahmad - Wali Kelas 5A & Bu Nurul - Wali Kelas 5B)
+        // B. Guru (Bapak Ahmad - Wali Kelas 7A & Bu Nurul - Wali Kelas 7B)
         $userGuruAhmad = User::create([
             'nama' => 'Bapak Ahmad',
             'username' => 'guru',
@@ -146,16 +146,16 @@ class DatabaseSeeder extends Seeder
         // ==========================================
         // 2. SEED KELAS
         // ==========================================
-        $kelas5A = Kelas::create([
-            'nama_kelas' => '5A',
-            'tingkat' => '5',
+        $kelas7A = Kelas::create([
+            'nama_kelas' => '7A',
+            'tingkat' => '7',
             'tahun_ajaran' => '2026/2027',
             'id_wali_guru' => $guruAhmad->id_guru,
         ]);
 
-        $kelas5B = Kelas::create([
-            'nama_kelas' => '5B',
-            'tingkat' => '5',
+        $kelas7B = Kelas::create([
+            'nama_kelas' => '7B',
+            'tingkat' => '7',
             'tahun_ajaran' => '2026/2027',
             'id_wali_guru' => $guruNurul->id_guru,
         ]);
@@ -168,7 +168,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1001',
                 'nama' => 'Ahmad Rizki',
-                'kelas_id' => $kelas5A->id_kelas,
+                'kelas_id' => $kelas7A->id_kelas,
                 'jenis_kelamin' => 'L',
                 'ortu_record' => $ortuSiti,
                 'hubungan' => 'Ibu',
@@ -176,7 +176,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1002',
                 'nama' => 'Aisyah Putri',
-                'kelas_id' => $kelas5A->id_kelas,
+                'kelas_id' => $kelas7A->id_kelas,
                 'jenis_kelamin' => 'P',
                 'ortu_record' => $ortuMap['aisyah']['ortu'],
                 'hubungan' => $ortuMap['aisyah']['hubungan'],
@@ -184,7 +184,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1003',
                 'nama' => 'Budi Santoso',
-                'kelas_id' => $kelas5A->id_kelas,
+                'kelas_id' => $kelas7A->id_kelas,
                 'jenis_kelamin' => 'L',
                 'ortu_record' => $ortuMap['budi']['ortu'],
                 'hubungan' => $ortuMap['budi']['hubungan'],
@@ -192,7 +192,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1004',
                 'nama' => 'Citra Lestari',
-                'kelas_id' => $kelas5B->id_kelas,
+                'kelas_id' => $kelas7B->id_kelas,
                 'jenis_kelamin' => 'P',
                 'ortu_record' => $ortuMap['citra']['ortu'],
                 'hubungan' => $ortuMap['citra']['hubungan'],
@@ -200,7 +200,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1005',
                 'nama' => 'Dani Pratama',
-                'kelas_id' => $kelas5B->id_kelas,
+                'kelas_id' => $kelas7B->id_kelas,
                 'jenis_kelamin' => 'L',
                 'ortu_record' => $ortuMap['dani']['ortu'],
                 'hubungan' => $ortuMap['dani']['hubungan'],
@@ -208,7 +208,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1006',
                 'nama' => 'Fajar Ramadhan',
-                'kelas_id' => $kelas5B->id_kelas,
+                'kelas_id' => $kelas7B->id_kelas,
                 'jenis_kelamin' => 'L',
                 'ortu_record' => $ortuMap['fajar']['ortu'],
                 'hubungan' => $ortuMap['fajar']['hubungan'],
@@ -216,7 +216,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nis' => '1007',
                 'nama' => 'Siti Aisyah',
-                'kelas_id' => $kelas5A->id_kelas,
+                'kelas_id' => $kelas7A->id_kelas,
                 'jenis_kelamin' => 'P',
                 'ortu_record' => $ortuMap['siti']['ortu'],
                 'hubungan' => $ortuMap['siti']['hubungan'],

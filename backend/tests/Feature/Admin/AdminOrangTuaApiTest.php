@@ -121,12 +121,23 @@ class AdminOrangTuaApiTest extends AdminApiTestCase
             ->assertJsonPath('message', 'Orang tua Ibu Rahmawati masih terhubung dengan siswa: Aisyah Putri. Lepaskan hubungan tersebut terlebih dahulu melalui menu Kelola Siswa.');
         $this->assertDatabaseHas('siswa_orang_tua', ['id_orang_tua' => $rahmawati->id_orang_tua]);
 
-        // Ibu Siti punya catatan; walau relasi anak dilepas tetap ditolak
+        // Ibu Siti punya catatan; walau relasi anak dilepas tetap wajib dikonfirmasi
         $siti = $this->ortu('ortu');
         $siti->siswa()->detach();
         $this->sebagaiAdmin()->deleteJson("/api/admin/orang-tua/{$siti->id_orang_tua}")
             ->assertStatus(409)
-            ->assertJsonPath('message', 'Orang tua Ibu Siti Nurhaliza memiliki 2 catatan penghubung. Data tidak dapat dihapus agar riwayat catatan tetap utuh; nonaktifkan akun sebagai gantinya.');
+            ->assertJsonPath('message', 'Orang tua Ibu Siti Nurhaliza memiliki 2 catatan penghubung yang akan ikut terhapus permanen. Konfirmasi penghapusan untuk melanjutkan.')
+            ->assertJsonPath('data.jumlah_catatan', 2);
         $this->assertDatabaseCount('catatan_penghubung', 3);
+
+        // Dikonfirmasi -> orang tua, akun login, dan catatannya terhapus; catatan lain tetap
+        $idUserSiti = $siti->id_user;
+        $this->sebagaiAdmin()->deleteJson("/api/admin/orang-tua/{$siti->id_orang_tua}?hapus_catatan=2")
+            ->assertOk()
+            ->assertJsonPath('message', 'Orang tua Ibu Siti Nurhaliza berhasil dihapus beserta 2 catatan penghubung');
+        $this->assertDatabaseMissing('orang_tua', ['id_orang_tua' => $siti->id_orang_tua]);
+        $this->assertDatabaseMissing('users', ['id_user' => $idUserSiti]);
+        $this->assertDatabaseCount('catatan_penghubung', 1);
+        $this->assertDatabaseHas('users', ['username' => 'guru']);
     }
 }

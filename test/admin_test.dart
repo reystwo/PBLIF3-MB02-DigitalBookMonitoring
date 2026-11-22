@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:digital_book_connect/models/admin_models.dart';
 import 'package:digital_book_connect/services/api_service.dart';
@@ -8,6 +13,7 @@ import 'package:digital_book_connect/screens/admin/admin_main_page.dart';
 import 'package:digital_book_connect/screens/admin/admin_widgets.dart';
 import 'package:digital_book_connect/screens/admin/kelola_guru_page.dart';
 import 'package:digital_book_connect/screens/admin/kelola_kelas_page.dart';
+import 'package:digital_book_connect/screens/admin/kelola_siswa_page.dart';
 
 void main() {
   group('Model Kelola Data Admin', () {
@@ -21,7 +27,7 @@ void main() {
         'nip': '198501152010011002',
         'no_hp': null,
         'kelas_wali': [
-          {'id_kelas': 1, 'nama_kelas': '5A', 'tahun_ajaran': '2026/2027'},
+          {'id_kelas': 1, 'nama_kelas': '7A', 'tahun_ajaran': '2026/2027'},
         ],
         'jumlah_catatan': 3,
       });
@@ -29,7 +35,7 @@ void main() {
       expect(guru.nama, 'Bapak Ahmad');
       expect(guru.aktif, isFalse);
       expect(guru.noHp, isNull);
-      expect(guru.kelasWali.single.namaKelas, '5A');
+      expect(guru.kelasWali.single.namaKelas, '7A');
       expect(guru.jumlahCatatan, 3);
     });
 
@@ -43,7 +49,7 @@ void main() {
         'no_hp': '081298765432',
         'alamat': '',
         'anak': [
-          {'id_siswa': 1, 'nis': '1001', 'nama': 'Ahmad Rizki', 'kelas': '5A', 'perempuan': false, 'hubungan': 'Ibu'},
+          {'id_siswa': 1, 'nis': '1001', 'nama': 'Ahmad Rizki', 'kelas': '7A', 'perempuan': false, 'hubungan': 'Ibu'},
         ],
       });
 
@@ -59,7 +65,7 @@ void main() {
         'nama': 'Siti Aisyah',
         'jenis_kelamin': 'P',
         'id_kelas': 1,
-        'kelas': '5A',
+        'kelas': '7A',
         'tahun_ajaran': '2026/2027',
         'orang_tua': [
           {'id_orang_tua': 9, 'nama': 'Ibu Fatimah', 'no_hp': '0812', 'hubungan': 'Ibu'},
@@ -74,8 +80,8 @@ void main() {
     test('KelasAdmin.fromJson & PageMeta', () {
       final kelas = KelasAdmin.fromJson({
         'id_kelas': 2,
-        'nama_kelas': '5B',
-        'tingkat': '5',
+        'nama_kelas': '7B',
+        'tingkat': '7',
         'tahun_ajaran': '2026/2027',
         'id_wali_guru': 2,
         'wali_guru': 'Ibu Nurul Hidayah',
@@ -239,8 +245,8 @@ void main() {
     testWidgets('Form Kelas memvalidasi format tahun ajaran & wali kelas', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: FormKelasPage()));
       final fields = find.byType(TextFormField);
-      await tester.enterText(fields.at(0), '6A');
-      await tester.enterText(fields.at(1), '6');
+      await tester.enterText(fields.at(0), '8A');
+      await tester.enterText(fields.at(1), '8');
       await tester.enterText(fields.at(2), '2026-2027');
       await tester.ensureVisible(find.text('Simpan'));
       await tester.pumpAndSettle();
@@ -249,6 +255,258 @@ void main() {
 
       expect(find.text('Format tahun ajaran harus YYYY/YYYY, contoh: 2026/2027'), findsOneWidget);
       expect(find.text('Wali kelas wajib dipilih'), findsOneWidget);
+    });
+  });
+
+  group('Detail Kelas: hapus siswa dari kelas', () {
+    late List<String> panggilan;
+    late List<Map<String, dynamic>> siswaKelas;
+    late http.Response Function() responsHapus;
+
+    Map<String, dynamic> siswa(int id, String nama) => {'id_siswa': id, 'nis': '10$id', 'nama': nama, 'perempuan': false};
+
+    MockClient server() => MockClient((req) async {
+          panggilan.add('${req.method} ${req.url.path}');
+          if (req.method == 'GET' && req.url.path.endsWith('/admin/kelas/1')) {
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'message': 'Detail kelas berhasil dimuat',
+                'data': {
+                  'id_kelas': 1,
+                  'nama_kelas': '7A',
+                  'tingkat': '7',
+                  'tahun_ajaran': '2026/2027',
+                  'id_wali_guru': 1,
+                  'wali_guru': 'Bapak Ahmad',
+                  'total_siswa': siswaKelas.length,
+                  'siswa': siswaKelas,
+                },
+              }),
+              200,
+            );
+          }
+          if (req.method == 'DELETE' && req.url.path.endsWith('/admin/kelas/1/siswa/11')) {
+            final res = responsHapus();
+            if (res.statusCode == 200) siswaKelas.removeWhere((s) => s['id_siswa'] == 11);
+            return res;
+          }
+          return http.Response(jsonEncode({'success': false, 'message': 'Tidak ditemukan'}), 404);
+        });
+
+    Finder tombolHapus(int idSiswa) => find.byKey(ValueKey('hapus-siswa-kelas-$idSiswa'));
+    Finder tombolDialog(String label) =>
+        find.descendant(of: find.byType(AlertDialog), matching: find.text(label));
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      panggilan = [];
+      siswaKelas = [siswa(11, 'Ahmad Rizki'), siswa(12, 'Budi Santoso')];
+      responsHapus = () => http.Response(
+            jsonEncode({'success': true, 'message': 'Siswa Ahmad Rizki berhasil dikeluarkan dari kelas 7A'}),
+            200,
+          );
+    });
+
+    testWidgets('konfirmasi lalu siswa hilang dari daftar & notifikasi berhasil tampil', (tester) async {
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const MaterialApp(home: DetailKelasPage(idKelas: 1)));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Ahmad Rizki'), findsOneWidget);
+        expect(tombolHapus(11), findsOneWidget);
+        expect(tombolHapus(12), findsOneWidget);
+
+        // Batal: tidak ada request hapus
+        await tester.ensureVisible(tombolHapus(11));
+        await tester.tap(tombolHapus(11));
+        await tester.pumpAndSettle();
+        expect(find.text('Hapus Siswa dari Kelas'), findsOneWidget);
+        expect(find.textContaining('Data siswa, orang tua, dan catatan penghubung tetap tersimpan'), findsOneWidget);
+        await tester.tap(tombolDialog('Batal'));
+        await tester.pumpAndSettle();
+        expect(panggilan.where((p) => p.startsWith('DELETE')), isEmpty);
+
+        // Konfirmasi: relasi dilepas lalu detail kelas dimuat ulang
+        await tester.tap(tombolHapus(11));
+        await tester.pumpAndSettle();
+        await tester.tap(tombolDialog('Hapus'));
+        await tester.pumpAndSettle();
+
+        expect(panggilan, contains('DELETE /api/admin/kelas/1/siswa/11'));
+        expect(find.text('Siswa Ahmad Rizki berhasil dikeluarkan dari kelas 7A'), findsOneWidget);
+        expect(find.text('Ahmad Rizki'), findsNothing);
+        expect(find.text('Budi Santoso'), findsOneWidget);
+        expect(find.text('1 siswa'), findsOneWidget);
+      }, server);
+    });
+
+    testWidgets('gagal menghapus: notifikasi gagal tampil & siswa tetap di daftar', (tester) async {
+      responsHapus = () => http.Response(jsonEncode({'success': false, 'message': 'Akses ditolak untuk peran Anda.'}), 403);
+
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const MaterialApp(home: DetailKelasPage(idKelas: 1)));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(tombolHapus(11));
+        await tester.tap(tombolHapus(11));
+        await tester.pumpAndSettle();
+        await tester.tap(tombolDialog('Hapus'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Akses ditolak untuk peran Anda.'), findsOneWidget);
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        expect(snackBar.backgroundColor, Colors.red.shade700);
+        expect(find.text('Ahmad Rizki'), findsOneWidget);
+        expect(find.text('2 siswa'), findsOneWidget);
+      }, server);
+    });
+
+    test('SiswaAdmin tanpa kelas (id_kelas null) terbaca sebagai belum punya kelas', () {
+      final s = SiswaAdmin.fromJson({'id_siswa': 1, 'nis': '1001', 'nama': 'Ahmad', 'id_kelas': null, 'kelas': ''});
+      expect(s.punyaKelas, isFalse);
+      expect(SiswaAdmin.fromJson({'id_siswa': 1, 'id_kelas': 3}).punyaKelas, isTrue);
+    });
+  });
+
+  group('Hapus data beserta catatan penghubung', () {
+    late List<String> panggilan;
+    late int jumlahCatatanDetail;
+    late int jumlahCatatanServer;
+
+    MockClient server() => MockClient((req) async {
+          panggilan.add('${req.method} ${req.url.path}${req.url.hasQuery ? '?${req.url.query}' : ''}');
+          if (req.method == 'GET' && req.url.path.endsWith('/admin/siswa/5')) {
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'message': 'Detail siswa berhasil dimuat',
+                'data': {
+                  'id_siswa': 5,
+                  'nis': '1001',
+                  'nama': 'Ahmad Rizki',
+                  'jenis_kelamin': 'L',
+                  'id_kelas': 1,
+                  'kelas': '7A',
+                  'orang_tua': [],
+                  'jumlah_catatan': jumlahCatatanDetail,
+                },
+              }),
+              200,
+            );
+          }
+          if (req.method == 'DELETE' && req.url.path.endsWith('/admin/siswa/5')) {
+            final dikonfirmasi = int.tryParse(req.url.queryParameters['hapus_catatan'] ?? '') ?? 0;
+            if (jumlahCatatanServer > 0 && dikonfirmasi != jumlahCatatanServer) {
+              return http.Response(
+                jsonEncode({
+                  'success': false,
+                  'message': 'Siswa Ahmad Rizki memiliki $jumlahCatatanServer catatan penghubung yang akan ikut terhapus permanen.',
+                  'data': {'jumlah_catatan': jumlahCatatanServer, 'perlu_konfirmasi_catatan': true},
+                }),
+                409,
+              );
+            }
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'message': 'Siswa Ahmad Rizki berhasil dihapus beserta $jumlahCatatanServer catatan penghubung',
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'success': false, 'message': 'Tidak ditemukan'}), 404);
+        });
+
+    Finder tombolDialog(String label) =>
+        find.descendant(of: find.byType(AlertDialog), matching: find.text(label));
+
+    /// Buka DetailSiswaPage dari halaman lain agar efek "kembali setelah terhapus" teruji.
+    Future<void> bukaDetail(WidgetTester tester) async {
+      // Layar setinggi ponsel agar tombol Hapus di bagian bawah detail terlihat
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const DetailSiswaPage(idSiswa: 5))),
+              child: const Text('Buka detail'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Buka detail'));
+      await tester.pumpAndSettle();
+      final tombolHapus = find.widgetWithText(OutlinedButton, 'Hapus');
+      await tester.ensureVisible(tombolHapus);
+      await tester.tap(tombolHapus);
+      await tester.pumpAndSettle();
+    }
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      panggilan = [];
+    });
+
+    testWidgets('menampilkan peringatan jumlah catatan lalu menghapus permanen setelah dikonfirmasi', (tester) async {
+      jumlahCatatanDetail = 2;
+      jumlahCatatanServer = 2;
+
+      await http.runWithClient(() async {
+        await bukaDetail(tester);
+
+        expect(
+          find.text('Data ini memiliki 2 catatan penghubung yang akan ikut terhapus permanen, '
+              'termasuk dari riwayat guru dan orang tua yang terkait.'),
+          findsOneWidget,
+        );
+        expect(tombolDialog('Hapus Permanen'), findsOneWidget);
+
+        // Batal: tidak ada request hapus
+        await tester.tap(tombolDialog('Batal'));
+        await tester.pumpAndSettle();
+        expect(panggilan.where((p) => p.startsWith('DELETE')), isEmpty);
+
+        final tombolHapus = find.widgetWithText(OutlinedButton, 'Hapus');
+        await tester.tap(tombolHapus);
+        await tester.pumpAndSettle();
+        await tester.tap(tombolDialog('Hapus Permanen'));
+        await tester.pumpAndSettle();
+
+        expect(panggilan, contains('DELETE /api/admin/siswa/5?hapus_catatan=2'));
+        expect(find.text('Siswa Ahmad Rizki berhasil dihapus beserta 2 catatan penghubung'), findsOneWidget);
+        expect(find.byType(DetailSiswaPage), findsNothing);
+      }, server);
+    });
+
+    testWidgets('jumlah catatan berubah di server: konfirmasi ulang dengan jumlah terbaru', (tester) async {
+      jumlahCatatanDetail = 0;
+      jumlahCatatanServer = 3;
+
+      await http.runWithClient(() async {
+        await bukaDetail(tester);
+
+        // Dialog biasa (detail belum mencatat catatan apa pun)
+        expect(tombolDialog('Hapus'), findsOneWidget);
+        expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
+        await tester.tap(tombolDialog('Hapus'));
+        await tester.pumpAndSettle();
+
+        // Server menolak dengan jumlah terbaru -> dialog konfirmasi khusus
+        expect(panggilan.last, 'DELETE /api/admin/siswa/5');
+        expect(find.textContaining('Jumlah catatan penghubung berubah sejak halaman dibuka.'), findsOneWidget);
+        expect(find.textContaining('Data ini memiliki 3 catatan penghubung'), findsOneWidget);
+        await tester.tap(tombolDialog('Hapus Permanen'));
+        await tester.pumpAndSettle();
+
+        expect(panggilan.last, 'DELETE /api/admin/siswa/5?hapus_catatan=3');
+        expect(find.text('Siswa Ahmad Rizki berhasil dihapus beserta 3 catatan penghubung'), findsOneWidget);
+        expect(find.byType(DetailSiswaPage), findsNothing);
+      }, server);
     });
   });
 }

@@ -96,17 +96,19 @@ class SiswaController extends AdminController
         ], 200);
     }
 
-    public function destroy(Siswa $siswa): JsonResponse
+    public function destroy(Request $request, Siswa $siswa): JsonResponse
     {
         $nama = $siswa->nama;
         $jumlahCatatan = $siswa->catatanPenghubung()->count();
 
-        if ($jumlahCatatan > 0) {
-            return $this->conflict("Siswa {$nama} memiliki {$jumlahCatatan} catatan penghubung. Data tidak dapat dihapus agar riwayat catatan tetap utuh.");
+        // Catatan penghubung siswa ikut terhapus permanen -> wajib dikonfirmasi Admin
+        if ($tolak = $this->tolakJikaCatatanBelumDikonfirmasi($request, $jumlahCatatan, "Siswa {$nama}")) {
+            return $tolak;
         }
 
         try {
             DB::transaction(function () use ($siswa) {
+                $siswa->catatanPenghubung()->delete();
                 // Hanya melepas relasi siswa_orang_tua; akun orang tua tetap ada
                 $siswa->orangTua()->detach();
                 $siswa->delete();
@@ -117,7 +119,7 @@ class SiswaController extends AdminController
 
         return response()->json([
             'success' => true,
-            'message' => "Siswa {$nama} berhasil dihapus",
+            'message' => $this->pesanTerhapus("Siswa {$nama}", $jumlahCatatan),
         ], 200);
     }
 

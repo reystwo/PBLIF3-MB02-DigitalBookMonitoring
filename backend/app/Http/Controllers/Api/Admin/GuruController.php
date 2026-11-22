@@ -102,7 +102,7 @@ class GuruController extends AdminController
         ], 200);
     }
 
-    public function destroy(Guru $guru): JsonResponse
+    public function destroy(Request $request, Guru $guru): JsonResponse
     {
         $guru->load(['user', 'kelasWali']);
         $nama = $guru->user?->nama ?? 'ini';
@@ -113,13 +113,15 @@ class GuruController extends AdminController
             return $this->conflict("Guru {$nama} masih menjadi wali kelas {$daftarKelas}. Ganti wali kelas tersebut terlebih dahulu melalui menu Kelola Kelas.");
         }
 
+        // Catatan yang dikirim/diterima guru ikut terhapus permanen -> wajib dikonfirmasi Admin
         $jumlahCatatan = $this->jumlahCatatanUser($guru->id_user);
-        if ($jumlahCatatan > 0) {
-            return $this->conflict("Guru {$nama} memiliki {$jumlahCatatan} catatan penghubung. Data tidak dapat dihapus agar riwayat catatan tetap utuh; nonaktifkan akun sebagai gantinya.");
+        if ($tolak = $this->tolakJikaCatatanBelumDikonfirmasi($request, $jumlahCatatan, "Guru {$nama}")) {
+            return $tolak;
         }
 
         try {
             DB::transaction(function () use ($guru) {
+                $this->catatanUser($guru->id_user)->delete();
                 $user = $guru->user;
                 $guru->delete();
                 if ($user) {
@@ -133,7 +135,7 @@ class GuruController extends AdminController
 
         return response()->json([
             'success' => true,
-            'message' => "Guru {$nama} berhasil dihapus",
+            'message' => $this->pesanTerhapus("Guru {$nama}", $jumlahCatatan),
         ], 200);
     }
 

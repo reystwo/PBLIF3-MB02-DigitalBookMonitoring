@@ -54,7 +54,8 @@ class DetailOrangTuaPage extends StatelessWidget {
       judul: 'Detail Orang Tua',
       judulHapus: 'Hapus Orang Tua',
       muat: () => AdminRepository.getDetailOrangTua(idOrangTua),
-      hapus: (o) => AdminRepository.hapusOrangTua(o.idOrangTua),
+      hapus: (o, hapusCatatan) => AdminRepository.hapusOrangTua(o.idOrangTua, hapusCatatan: hapusCatatan),
+      jumlahCatatan: (o) => o.jumlahCatatan,
       pesanKonfirmasiHapus: (o) =>
           'Hapus data orang tua ${o.nama}? Akun login orang tua ini juga akan dihapus dan tindakan ini tidak dapat dibatalkan.',
       bukaEdit: (context, o) =>

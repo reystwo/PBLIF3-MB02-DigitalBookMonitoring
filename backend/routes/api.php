@@ -91,5 +91,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('kelas', AdminKelasController::class)
             ->parameters(['kelas' => 'kelas'])
             ->missing($tidakDitemukan('kelas'));
+
+        // Keluarkan siswa dari kelas (hanya melepas relasi siswa.id_kelas, data siswa tetap ada)
+        Route::delete('kelas/{kelas}/siswa/{siswa}', [AdminKelasController::class, 'keluarkanSiswa'])
+            ->whereNumber(['kelas', 'siswa'])
+            ->name('kelas.siswa.destroy')
+            ->missing($tidakDitemukan('kelas atau siswa'));
     });
 });

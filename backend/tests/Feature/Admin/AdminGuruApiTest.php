@@ -72,7 +72,7 @@ class AdminGuruApiTest extends AdminApiTestCase
         $this->sebagaiAdmin()->getJson('/api/admin/guru?search=Nurul')
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.username', 'guru_nurul')
-            ->assertJsonPath('data.0.kelas_wali.0.nama_kelas', '5B');
+            ->assertJsonPath('data.0.kelas_wali.0.nama_kelas', '7B');
 
         $this->sebagaiAdmin()->getJson('/api/admin/guru?search=198501152010011002')
             ->assertJsonCount(1, 'data')
@@ -94,7 +94,7 @@ class AdminGuruApiTest extends AdminApiTestCase
         $this->sebagaiAdmin()->getJson("/api/admin/guru/{$guru->id_guru}")
             ->assertOk()
             ->assertJsonPath('data.nama', 'Bapak Ahmad')
-            ->assertJsonPath('data.kelas_wali.0.nama_kelas', '5A')
+            ->assertJsonPath('data.kelas_wali.0.nama_kelas', '7A')
             ->assertJsonPath('data.jumlah_catatan', 3)
             ->assertJsonMissingPath('data.password');
 
@@ -196,15 +196,15 @@ class AdminGuruApiTest extends AdminApiTestCase
         $ahmad = Guru::whereHas('user', fn ($q) => $q->where('username', 'guru'))->first();
         $nurul = Guru::whereHas('user', fn ($q) => $q->where('username', 'guru_nurul'))->first();
 
-        // Masih wali kelas 5B
+        // Masih wali kelas 7B
         $this->sebagaiAdmin()->deleteJson("/api/admin/guru/{$nurul->id_guru}")
             ->assertStatus(409)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Guru Ibu Nurul Hidayah masih menjadi wali kelas 5B. Ganti wali kelas tersebut terlebih dahulu melalui menu Kelola Kelas.');
+            ->assertJsonPath('message', 'Guru Ibu Nurul Hidayah masih menjadi wali kelas 7B. Ganti wali kelas tersebut terlebih dahulu melalui menu Kelola Kelas.');
         $this->assertDatabaseHas('guru', ['id_guru' => $nurul->id_guru]);
 
-        // Setelah wali kelas 5B dipindah, Bu Nurul (tanpa catatan) dapat dihapus
-        Kelas::where('nama_kelas', '5B')->update(['id_wali_guru' => $ahmad->id_guru]);
+        // Setelah wali kelas 7B dipindah, Bu Nurul (tanpa catatan) dapat dihapus
+        Kelas::where('nama_kelas', '7B')->update(['id_wali_guru' => $ahmad->id_guru]);
         $idUserNurul = $nurul->id_user;
         $this->sebagaiAdmin()->deleteJson("/api/admin/guru/{$nurul->id_guru}")
             ->assertOk()
@@ -212,12 +212,30 @@ class AdminGuruApiTest extends AdminApiTestCase
         $this->assertDatabaseMissing('guru', ['id_guru' => $nurul->id_guru]);
         $this->assertDatabaseMissing('users', ['id_user' => $idUserNurul]);
 
-        // Pak Ahmad memiliki catatan -> ditolak walau wali kelas dipindahkan
+        // Konfirmasi hapus catatan tidak melewati penjagaan wali kelas
+        $this->sebagaiAdmin()->deleteJson("/api/admin/guru/{$ahmad->id_guru}?hapus_catatan=3")
+            ->assertStatus(409)
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'masih menjadi wali kelas'));
+        $this->assertDatabaseCount('catatan_penghubung', 3);
+
+        // Pak Ahmad memiliki catatan -> wajib dikonfirmasi walau wali kelas sudah dipindahkan
         $guruBaru = $this->sebagaiAdmin()->postJson('/api/admin/guru', $this->dataGuru())->json('data.id_guru');
         Kelas::query()->update(['id_wali_guru' => $guruBaru]);
         $this->sebagaiAdmin()->deleteJson("/api/admin/guru/{$ahmad->id_guru}")
             ->assertStatus(409)
-            ->assertJsonPath('message', 'Guru Bapak Ahmad memiliki 3 catatan penghubung. Data tidak dapat dihapus agar riwayat catatan tetap utuh; nonaktifkan akun sebagai gantinya.');
+            ->assertJsonPath('message', 'Guru Bapak Ahmad memiliki 3 catatan penghubung yang akan ikut terhapus permanen. Konfirmasi penghapusan untuk melanjutkan.')
+            ->assertJsonPath('data.jumlah_catatan', 3);
         $this->assertDatabaseCount('catatan_penghubung', 3);
+
+        // Dikonfirmasi -> guru, akun login, dan seluruh catatannya terhapus
+        $idUserAhmad = $ahmad->id_user;
+        $this->sebagaiAdmin()->deleteJson("/api/admin/guru/{$ahmad->id_guru}?hapus_catatan=3")
+            ->assertOk()
+            ->assertJsonPath('message', 'Guru Bapak Ahmad berhasil dihapus beserta 3 catatan penghubung');
+        $this->assertDatabaseMissing('guru', ['id_guru' => $ahmad->id_guru]);
+        $this->assertDatabaseMissing('users', ['id_user' => $idUserAhmad]);
+        $this->assertDatabaseCount('catatan_penghubung', 0);
+        $this->assertDatabaseHas('users', ['username' => 'ortu']);
+        $this->assertDatabaseCount('siswa', 7);
     }
 }

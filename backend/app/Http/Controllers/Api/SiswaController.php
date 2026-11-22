@@ -40,7 +40,7 @@ class SiswaController extends Controller
             $query->tanggungJawabGuru($user->guru);
         }
 
-        // Filter kelas (nama_kelas, misal: '5A', '5B')
+        // Filter kelas (nama_kelas, misal: '7A', '7B')
         if ($request->filled('kelas')) {
             $namaKelas = $request->query('kelas');
             $query->whereHas('kelas', function ($q) use ($namaKelas) {

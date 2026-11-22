@@ -68,7 +68,7 @@ class EndToEndBookConnectTest extends TestCase
         // LANGKAH 2: Guru Memilih Siswa (Ahmad Rizki)
         // -------------------------------------------------------------
         $siswaListRes = $this->withHeader('Authorization', 'Bearer ' . $guruToken)
-            ->getJson('/api/siswa?kelas=5A');
+            ->getJson('/api/siswa?kelas=7A');
 
         $siswaListRes->assertStatus(200)
             ->assertJson([
@@ -76,7 +76,7 @@ class EndToEndBookConnectTest extends TestCase
             ]);
 
         $siswaList = $siswaListRes->json('data');
-        $this->assertNotEmpty($siswaList, 'Daftar siswa kelas 5A tidak boleh kosong.');
+        $this->assertNotEmpty($siswaList, 'Daftar siswa kelas 7A tidak boleh kosong.');
 
         // Pilih siswa Ahmad Rizki
         $siswaAhmad = null;

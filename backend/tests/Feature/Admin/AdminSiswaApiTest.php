@@ -24,7 +24,7 @@ class AdminSiswaApiTest extends AdminApiTestCase
             'nis' => '2001',
             'nama' => 'Zahra Amalia',
             'jenis_kelamin' => 'P',
-            'id_kelas' => $this->idKelas('5B'),
+            'id_kelas' => $this->idKelas('7B'),
             'orang_tua' => [
                 ['id_orang_tua' => $this->idOrtu('ortu_citra'), 'hubungan' => 'Ibu'],
             ],
@@ -41,7 +41,7 @@ class AdminSiswaApiTest extends AdminApiTestCase
                 'message' => 'Siswa Zahra Amalia berhasil ditambahkan',
                 'data' => [
                     'nis' => '2001',
-                    'kelas' => '5B',
+                    'kelas' => '7B',
                     'perempuan' => true,
                     'wali_kelas' => 'Ibu Nurul Hidayah',
                     'orang_tua' => [['nama' => 'Ibu Dewi Lestari', 'hubungan' => 'Ibu']],
@@ -55,11 +55,11 @@ class AdminSiswaApiTest extends AdminApiTestCase
             'hubungan' => 'Ibu',
         ]);
 
-        // Relasi konsisten: orang tua kini melihat anak barunya, dan guru 5B melihat siswa barunya
+        // Relasi konsisten: orang tua kini melihat anak barunya, dan guru 7B melihat siswa barunya
         $this->sebagai('ortu_citra')->getJson('/api/siswa')
             ->assertOk()
             ->assertJsonCount(2, 'data');
-        $this->sebagai('guru_nurul')->getJson('/api/siswa?kelas=5B')
+        $this->sebagai('guru_nurul')->getJson('/api/siswa?kelas=7B')
             ->assertJsonFragment(['nama' => 'Zahra Amalia']);
     }
 
@@ -103,27 +103,27 @@ class AdminSiswaApiTest extends AdminApiTestCase
             'nis' => '1003',
             'nama' => 'Budi Santoso Putra',
             'jenis_kelamin' => 'L',
-            'id_kelas' => $this->idKelas('5B'),
+            'id_kelas' => $this->idKelas('7B'),
             'orang_tua' => [
                 ['id_orang_tua' => $this->idOrtu('ortu_budi'), 'hubungan' => 'Ayah'],
                 ['id_orang_tua' => $this->idOrtu('ortu_dani'), 'hubungan' => 'Wali'],
             ],
         ])
             ->assertOk()
-            ->assertJsonPath('data.kelas', '5B')
+            ->assertJsonPath('data.kelas', '7B')
             ->assertJsonCount(2, 'data.orang_tua');
 
-        $this->assertDatabaseHas('siswa', ['id_siswa' => $budi->id_siswa, 'nama' => 'Budi Santoso Putra', 'id_kelas' => $this->idKelas('5B')]);
+        $this->assertDatabaseHas('siswa', ['id_siswa' => $budi->id_siswa, 'nama' => 'Budi Santoso Putra', 'id_kelas' => $this->idKelas('7B')]);
         $this->assertDatabaseHas('siswa_orang_tua', ['id_siswa' => $budi->id_siswa, 'id_orang_tua' => $this->idOrtu('ortu_dani'), 'hubungan' => 'Wali']);
 
         // Tanpa field orang_tua -> relasi tidak berubah
         $this->sebagaiAdmin()->putJson("/api/admin/siswa/{$budi->id_siswa}", [
-            'nis' => '1003', 'nama' => 'Budi Santoso', 'jenis_kelamin' => 'L', 'id_kelas' => $this->idKelas('5A'),
+            'nis' => '1003', 'nama' => 'Budi Santoso', 'jenis_kelamin' => 'L', 'id_kelas' => $this->idKelas('7A'),
         ])->assertOk()->assertJsonCount(2, 'data.orang_tua');
 
         // Daftar kosong -> seluruh relasi orang tua dilepas (akun orang tua tetap ada)
         $this->sebagaiAdmin()->putJson("/api/admin/siswa/{$budi->id_siswa}", [
-            'nis' => '1003', 'nama' => 'Budi Santoso', 'jenis_kelamin' => 'L', 'id_kelas' => $this->idKelas('5A'), 'orang_tua' => [],
+            'nis' => '1003', 'nama' => 'Budi Santoso', 'jenis_kelamin' => 'L', 'id_kelas' => $this->idKelas('7A'), 'orang_tua' => [],
         ])->assertOk()->assertJsonCount(0, 'data.orang_tua');
         $this->assertDatabaseMissing('siswa_orang_tua', ['id_siswa' => $budi->id_siswa]);
         $this->assertDatabaseHas('orang_tua', ['id_orang_tua' => $this->idOrtu('ortu_budi')]);
@@ -147,17 +147,40 @@ class AdminSiswaApiTest extends AdminApiTestCase
         $this->sebagaiAdmin()->getJson('/api/admin/siswa?search=aisyah')
             ->assertJsonCount(2, 'data');
 
-        $this->sebagaiAdmin()->getJson('/api/admin/siswa?id_kelas='.$this->idKelas('5B'))
+        $this->sebagaiAdmin()->getJson('/api/admin/siswa?id_kelas='.$this->idKelas('7B'))
             ->assertJsonPath('meta.total', 3);
     }
 
-    public function test_hapus_siswa_dibatasi_jika_memiliki_catatan(): void
+    public function test_hapus_siswa_dengan_catatan_wajib_dikonfirmasi_lalu_catatan_ikut_terhapus(): void
     {
         $rizki = Siswa::where('nis', '1001')->first();
+        $idOrtuRizki = $rizki->orangTua()->value('orang_tua.id_orang_tua');
+
+        // Tanpa konfirmasi -> ditolak beserta jumlah catatan yang perlu dikonfirmasi
         $this->sebagaiAdmin()->deleteJson("/api/admin/siswa/{$rizki->id_siswa}")
             ->assertStatus(409)
-            ->assertJsonPath('message', 'Siswa Ahmad Rizki memiliki 2 catatan penghubung. Data tidak dapat dihapus agar riwayat catatan tetap utuh.');
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Siswa Ahmad Rizki memiliki 2 catatan penghubung yang akan ikut terhapus permanen. Konfirmasi penghapusan untuk melanjutkan.')
+            ->assertJsonPath('data.jumlah_catatan', 2)
+            ->assertJsonPath('data.perlu_konfirmasi_catatan', true);
+
+        // Jumlah konfirmasi tidak sesuai (mis. data sudah berubah) -> tetap ditolak
+        foreach (['1', '3', 'abc', ''] as $nilai) {
+            $this->sebagaiAdmin()->deleteJson("/api/admin/siswa/{$rizki->id_siswa}?hapus_catatan={$nilai}")
+                ->assertStatus(409)
+                ->assertJsonPath('data.jumlah_catatan', 2);
+        }
         $this->assertDatabaseHas('siswa', ['id_siswa' => $rizki->id_siswa]);
+        $this->assertDatabaseCount('catatan_penghubung', 3);
+
+        // Konfirmasi sesuai -> siswa & catatannya terhapus; akun orang tua tetap ada
+        $this->sebagaiAdmin()->deleteJson("/api/admin/siswa/{$rizki->id_siswa}?hapus_catatan=2")
+            ->assertOk()
+            ->assertJsonPath('message', 'Siswa Ahmad Rizki berhasil dihapus beserta 2 catatan penghubung');
+        $this->assertDatabaseMissing('siswa', ['id_siswa' => $rizki->id_siswa]);
+        $this->assertDatabaseMissing('catatan_penghubung', ['id_siswa' => $rizki->id_siswa]);
+        $this->assertDatabaseCount('catatan_penghubung', 1);
+        $this->assertDatabaseHas('orang_tua', ['id_orang_tua' => $idOrtuRizki]);
 
         // Siswa tanpa catatan dapat dihapus; akun orang tua tetap ada
         $citra = Siswa::where('nis', '1004')->first();

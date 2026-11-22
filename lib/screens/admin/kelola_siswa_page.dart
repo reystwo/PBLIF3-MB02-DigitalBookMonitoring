@@ -22,7 +22,7 @@ class KelolaSiswaPage extends StatelessWidget {
       fetcher: (page, search) => AdminRepository.getSiswa(page: page, search: search),
       itemBuilder: (s, onTap) => ListItemTile(
         judul: Text(s.nama),
-        subjudul: 'NIS ${s.nis} · Kelas ${s.kelas}',
+        subjudul: 'NIS ${s.nis} · ${s.punyaKelas ? 'Kelas ${s.kelas}' : 'Belum ada kelas'}',
         keterangan: s.orangTua.isEmpty
             ? 'Belum ada data orang tua'
             : 'Orang tua: ${s.orangTua.map((o) => o.nama).join(', ')}',
@@ -48,7 +48,8 @@ class DetailSiswaPage extends StatelessWidget {
       judul: 'Detail Siswa',
       judulHapus: 'Hapus Siswa',
       muat: () => AdminRepository.getDetailSiswa(idSiswa),
-      hapus: (s) => AdminRepository.hapusSiswa(s.idSiswa),
+      hapus: (s, hapusCatatan) => AdminRepository.hapusSiswa(s.idSiswa, hapusCatatan: hapusCatatan),
+      jumlahCatatan: (s) => s.jumlahCatatan,
       pesanKonfirmasiHapus: (s) =>
           'Hapus data siswa ${s.nama}? Hubungan dengan orang tua akan dilepas (akun orang tua tetap ada). Tindakan ini tidak dapat dibatalkan.',
       bukaEdit: (context, s) =>
@@ -63,7 +64,12 @@ class DetailSiswaPage extends StatelessWidget {
         InfoCard(
           baris: [
             InfoBaris('Jenis Kelamin', s.perempuan ? 'Perempuan' : 'Laki-laki'),
-            InfoBaris('Kelas', s.tahunAjaran.isEmpty ? s.kelas : '${s.kelas} (${s.tahunAjaran})'),
+            InfoBaris(
+              'Kelas',
+              !s.punyaKelas
+                  ? 'Belum ada kelas'
+                  : (s.tahunAjaran.isEmpty ? s.kelas : '${s.kelas} (${s.tahunAjaran})'),
+            ),
             InfoBaris('Wali Kelas', s.waliKelas),
             InfoBaris('Catatan', '${s.jumlahCatatan} catatan penghubung'),
           ],
@@ -101,8 +107,9 @@ class _FormSiswaPageState extends State<FormSiswaPage> {
   late final _nis = TextEditingController(text: widget.siswa?.nis);
   late final _nama = TextEditingController(text: widget.siswa?.nama);
   late String? _jenisKelamin = widget.siswa?.jenisKelamin;
-  late int? _idKelas = widget.siswa?.idKelas;
-  late String? _labelKelas = widget.siswa == null
+  // Siswa yang dikeluarkan dari kelas wajib dipilihkan kelas baru saat diubah
+  late int? _idKelas = (widget.siswa?.punyaKelas ?? false) ? widget.siswa!.idKelas : null;
+  late String? _labelKelas = (widget.siswa == null || !widget.siswa!.punyaKelas)
       ? null
       : (widget.siswa!.tahunAjaran.isEmpty
           ? 'Kelas ${widget.siswa!.kelas}'

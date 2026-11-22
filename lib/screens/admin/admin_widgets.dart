@@ -25,12 +25,51 @@ void tampilkanPesan(BuildContext context, String pesan, {bool gagal = false}) {
 }
 
 // --- DIALOG KONFIRMASI HAPUS ---
-Future<bool> konfirmasiHapus(BuildContext context, {required String judul, required String pesan}) async {
+/// [peringatan] (opsional) ditampilkan menonjol, mis. data terkait yang ikut terhapus permanen.
+Future<bool> konfirmasiHapus(
+  BuildContext context, {
+  required String judul,
+  required String pesan,
+  String? peringatan,
+  String labelHapus = 'Hapus',
+}) async {
   final hasil = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: Text(judul),
-      content: Text(pesan),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(pesan),
+            if (peringatan != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 20, color: Colors.red.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        peringatan,
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.red.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -38,13 +77,18 @@ Future<bool> konfirmasiHapus(BuildContext context, {required String judul, requi
         ),
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+          child: Text(labelHapus, style: const TextStyle(color: Colors.red)),
         ),
       ],
     ),
   );
   return hasil ?? false;
 }
+
+/// Teks peringatan catatan penghubung yang ikut terhapus permanen.
+String peringatanCatatanTerhapus(int jumlahCatatan) =>
+    'Data ini memiliki $jumlahCatatan catatan penghubung yang akan ikut terhapus permanen, '
+    'termasuk dari riwayat guru dan orang tua yang terkait.';
 
 // --- GAYA INPUT FORM (sama dengan halaman Tambah Catatan) ---
 InputDecoration adminInputDecoration({String? hint, String? errorText, String? helperText, Widget? suffixIcon}) {
@@ -668,8 +712,12 @@ class AdminDetailPage<T> extends StatefulWidget {
   final Future<ApiResponse<T>> Function() muat;
   final List<Widget> Function(BuildContext context, T data) isi;
   final Future<bool?> Function(BuildContext context, T data) bukaEdit;
-  final Future<ApiResponse<void>> Function(T data) hapus;
+  // hapusCatatan = jumlah catatan penghubung yang dikonfirmasi Admin untuk ikut terhapus.
+  // `data` respons berisi jumlah catatan terbaru bila backend meminta konfirmasi ulang.
+  final Future<ApiResponse<int>> Function(T data, int hapusCatatan) hapus;
   final String Function(T data) pesanKonfirmasiHapus;
+  // Jumlah catatan penghubung milik data (opsional); > 0 -> konfirmasi khusus hapus permanen
+  final int Function(T data)? jumlahCatatan;
 
   const AdminDetailPage({
     super.key,
@@ -680,7 +728,13 @@ class AdminDetailPage<T> extends StatefulWidget {
     required this.bukaEdit,
     required this.hapus,
     required this.pesanKonfirmasiHapus,
+    this.jumlahCatatan,
   });
+
+  /// Muat ulang data halaman detail terdekat, mis. setelah aksi pada isi halaman
+  /// (keluarkan siswa dari kelas). [context] harus berada di dalam isi halaman.
+  static Future<void> muatUlang(BuildContext context) =>
+      context.findAncestorStateOfType<_AdminDetailPageState<dynamic>>()?._muat() ?? Future.value();
 
   @override
   State<AdminDetailPage<T>> createState() => _AdminDetailPageState<T>();
@@ -720,17 +774,45 @@ class _AdminDetailPageState<T> extends State<AdminDetailPage<T>> {
     if (tersimpan == true && mounted) _muat();
   }
 
+  Future<bool> _konfirmasi(T data, int jumlahCatatan, {bool berubah = false}) {
+    final adaCatatan = jumlahCatatan > 0;
+    return konfirmasiHapus(
+      context,
+      judul: widget.judulHapus,
+      pesan: [
+        if (berubah) 'Jumlah catatan penghubung berubah sejak halaman dibuka.',
+        widget.pesanKonfirmasiHapus(data),
+      ].join('\n\n'),
+      peringatan: adaCatatan ? peringatanCatatanTerhapus(jumlahCatatan) : null,
+      labelHapus: adaCatatan ? 'Hapus Permanen' : 'Hapus',
+    );
+  }
+
   Future<void> _hapus(T data) async {
-    final setuju = await konfirmasiHapus(context, judul: widget.judulHapus, pesan: widget.pesanKonfirmasiHapus(data));
-    if (!setuju || !mounted) return;
+    var jumlahCatatan = widget.jumlahCatatan?.call(data) ?? 0;
+    var berubah = false;
 
-    setState(() => _menghapus = true);
-    final res = await widget.hapus(data);
-    if (!mounted) return;
-    setState(() => _menghapus = false);
+    while (true) {
+      final setuju = await _konfirmasi(data, jumlahCatatan, berubah: berubah);
+      if (!setuju || !mounted) return;
 
-    tampilkanPesan(context, res.message, gagal: !res.isSuccess);
-    if (res.isSuccess) Navigator.of(context).pop();
+      setState(() => _menghapus = true);
+      final res = await widget.hapus(data, jumlahCatatan);
+      if (!mounted) return;
+      setState(() => _menghapus = false);
+
+      // Backend meminta konfirmasi dengan jumlah catatan terbaru -> tanyakan ulang
+      final jumlahTerbaru = res.data;
+      if (!res.isSuccess && jumlahTerbaru != null && jumlahTerbaru > 0 && jumlahTerbaru != jumlahCatatan) {
+        jumlahCatatan = jumlahTerbaru;
+        berubah = true;
+        continue;
+      }
+
+      tampilkanPesan(context, res.message, gagal: !res.isSuccess);
+      if (res.isSuccess) Navigator.of(context).pop();
+      return;
+    }
   }
 
   @override

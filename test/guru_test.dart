@@ -17,7 +17,7 @@ const _siswaJson = {
   'jenis_kelamin': 'L',
   'perempuan': false,
   'id_kelas': 1,
-  'kelas': '5A',
+  'kelas': '7A',
   'tahun_ajaran': '2026/2027',
   'jumlah_catatan': 2,
   'wali_kelas': 'Bapak Ahmad',
@@ -30,12 +30,12 @@ CatatanModel _catatan(int id, String isi, String dibuat, {String penulis = 'Bapa
       'id_catatan': id,
       'id_siswa': 1,
       'penulis': penulis,
-      'peran_penulis': penulis == 'Bapak Ahmad' ? 'Guru Kelas 5A' : 'Orang Tua',
+      'peran_penulis': penulis == 'Bapak Ahmad' ? 'Guru Kelas 7A' : 'Orang Tua',
       'kategori': 'Akademik',
       'isi_catatan': isi,
       'tanggal': dibuat,
       'created_at': dibuat,
-      'siswa': {'id_siswa': 1, 'nama': 'Ahmad Rizki', 'kelas': '5A'},
+      'siswa': {'id_siswa': 1, 'nama': 'Ahmad Rizki', 'kelas': '7A'},
     });
 
 ApiResponse<PagedResult<CatatanModel>> _halaman(List<CatatanModel> items, {int page = 1, int lastPage = 1, int? total}) =>
@@ -54,7 +54,7 @@ void main() {
     test('SiswaGuru.fromJson membaca detail siswa beserta orang tua', () {
       final s = SiswaGuru.fromJson(_siswaJson);
       expect(s.idSiswa, 1);
-      expect(s.labelKelas, 'Kelas 5A (2026/2027)');
+      expect(s.labelKelas, 'Kelas 7A (2026/2027)');
       expect(s.waliKelas, 'Bapak Ahmad');
       expect(s.jumlahCatatan, 2);
       expect(s.orangTua.single.hubungan, 'Ibu');
@@ -83,7 +83,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ahmad Rizki'), findsOneWidget);
-      expect(find.text('NIS 1001 · Kelas 5A'), findsOneWidget);
+      expect(find.text('NIS 1001 · Kelas 7A'), findsOneWidget);
       expect(find.text('2 catatan'), findsOneWidget);
       expect(find.text('1 data ditemukan'), findsOneWidget);
       expect(find.byType(FloatingActionButton), findsNothing);
@@ -211,7 +211,7 @@ void main() {
   });
 
   group('Form tambah catatan', () {
-    const siswa = Siswa(idSiswa: 1, nama: 'Ahmad Rizki', kelas: '5A');
+    const siswa = Siswa(idSiswa: 1, nama: 'Ahmad Rizki', kelas: '7A');
 
     Future<Future<bool?>> bukaForm(WidgetTester tester, KirimCatatan kirim) async {
       late Future<bool?> hasil;

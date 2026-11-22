@@ -68,7 +68,7 @@ class AuthApiTest extends TestCase
             ]);
 
         $this->assertEquals('guru', $response->json('data.user.role'));
-        $this->assertEquals('Wali Kelas 5A', $response->json('data.user.peran_label'));
+        $this->assertEquals('Wali Kelas 7A', $response->json('data.user.peran_label'));
     }
 
     /**

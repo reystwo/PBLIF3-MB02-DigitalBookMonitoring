@@ -46,20 +46,20 @@ void main() {
         'jenis_kelamin': 'L',
         'perempuan': false,
         'id_kelas': 1,
-        'kelas': '5A',
+        'kelas': '7A',
         'orang_tua': [],
       };
 
       final siswaModel = SiswaModel.fromJson(json);
       expect(siswaModel.idSiswa, equals(1));
       expect(siswaModel.nama, equals('Ahmad Rizki'));
-      expect(siswaModel.kelas, equals('5A'));
+      expect(siswaModel.kelas, equals('7A'));
       expect(siswaModel.perempuan, isFalse);
 
       final dummySiswa = Siswa.fromModel(siswaModel);
       expect(dummySiswa.idSiswa, equals(1));
       expect(dummySiswa.nama, equals('Ahmad Rizki'));
-      expect(dummySiswa.kelas, equals('5A'));
+      expect(dummySiswa.kelas, equals('7A'));
       expect(dummySiswa.perempuan, isFalse);
 
       final backToModel = dummySiswa.toModel();
@@ -73,7 +73,7 @@ void main() {
         'id_pengirim': 2,
         'id_penerima': 3,
         'penulis': 'Bapak Ahmad',
-        'peran_penulis': 'Guru Kelas 5A',
+        'peran_penulis': 'Guru Kelas 7A',
         'penulis_perempuan': false,
         'kategori': 'Akademik',
         'isi': 'Perkembangan membaca sangat baik.',
@@ -84,7 +84,7 @@ void main() {
           'id_siswa': 1,
           'nis': '1001',
           'nama': 'Ahmad Rizki',
-          'kelas': '5A',
+          'kelas': '7A',
         },
         'lampiran': {
           'nama_file': 'catatan.pdf',

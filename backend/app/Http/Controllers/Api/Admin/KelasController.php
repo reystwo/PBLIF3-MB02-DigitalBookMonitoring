@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Requests\Admin\KelasRequest;
 use App\Models\Kelas;
+use App\Models\Siswa;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,6 +91,33 @@ class KelasController extends AdminController
         return response()->json([
             'success' => true,
             'message' => "Kelas {$nama} berhasil dihapus",
+        ], 200);
+    }
+
+    /**
+     * Keluarkan siswa dari kelas: hanya melepas relasi siswa.id_kelas (menjadi NULL).
+     * Data siswa, relasi orang tua (siswa_orang_tua), dan catatan penghubung tetap utuh.
+     */
+    public function keluarkanSiswa(Kelas $kelas, Siswa $siswa): JsonResponse
+    {
+        if ((int) $siswa->id_kelas !== (int) $kelas->id_kelas) {
+            return response()->json([
+                'success' => false,
+                'message' => "Siswa {$siswa->nama} tidak terdaftar di kelas {$kelas->nama_kelas}.",
+            ], 404);
+        }
+
+        $siswa->kelas()->dissociate();
+        $siswa->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Siswa {$siswa->nama} berhasil dikeluarkan dari kelas {$kelas->nama_kelas}",
+            'data' => [
+                'id_kelas' => $kelas->id_kelas,
+                'id_siswa' => $siswa->id_siswa,
+                'total_siswa' => $kelas->siswa()->count(),
+            ],
         ], 200);
     }
 

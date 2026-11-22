@@ -84,8 +84,8 @@ class _GuruDashboard extends StatefulWidget {
 }
 
 class _GuruDashboardState extends State<_GuruDashboard> {
-  String _kelasNama = 'Kelas 5A';
-  final _sekolah = 'SDN 01 Batam';
+  String _kelasNama = 'Kelas 7A';
+  final _sekolah = 'SMP Negeri 40 Batam';
   List<Aktivitas> _listAktivitas = aktivitasTerbaru;
 
   @override
