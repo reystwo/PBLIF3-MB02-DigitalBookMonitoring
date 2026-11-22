@@ -16,7 +16,10 @@ class RiwayatCatatanPage extends StatefulWidget {
 }
 
 class _RiwayatCatatanPageState extends State<RiwayatCatatanPage> {
-  List<Catatan> _listCatatan = daftarCatatan;
+  // Hanya data dari server: daftar kosong berarti memang belum ada catatan
+  List<Catatan> _listCatatan = const [];
+  bool _memuat = true;
+  String? _error;
 
   @override
   void initState() {
@@ -25,20 +28,28 @@ class _RiwayatCatatanPageState extends State<RiwayatCatatanPage> {
   }
 
   Future<void> _fetchCatatan() async {
-    try {
-      final res = await AppRepository.getCatatan();
-      if (mounted) {
-        setState(() {
-          if (res.isSuccess && res.data != null && res.data!.isNotEmpty) {
-            _listCatatan = res.data!.map((m) => Catatan.fromModel(m)).toList();
-          }
-        });
+    final res = await AppRepository.getCatatan();
+    if (!mounted) return;
+    setState(() {
+      _memuat = false;
+      if (res.isSuccess) {
+        _error = null;
+        _listCatatan = (res.data ?? const []).map((m) => Catatan.fromModel(m)).toList();
+      } else {
+        _error = res.message;
       }
-    } catch (_) {}
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_memuat) {
+      return Scaffold(
+        appBar: JudulAppBar(judul: widget.judul, onBack: widget.onBack),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
     return Scaffold(
       appBar: JudulAppBar(judul: widget.judul, onBack: widget.onBack),
       body: RefreshIndicator(
@@ -46,11 +57,13 @@ class _RiwayatCatatanPageState extends State<RiwayatCatatanPage> {
         child: _listCatatan.isEmpty
             ? ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
+                children: [
                   Padding(
-                    padding: EdgeInsets.only(top: 80),
-                    child: Center(
-                      child: Text('Belum ada catatan', style: TextStyle(color: AppColors.textGrey)),
+                    padding: const EdgeInsets.fromLTRB(24, 80, 24, 0),
+                    child: Text(
+                      _error == null ? 'Belum ada catatan' : 'Gagal memuat catatan.\n$_error',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.textGrey),
                     ),
                   ),
                 ],

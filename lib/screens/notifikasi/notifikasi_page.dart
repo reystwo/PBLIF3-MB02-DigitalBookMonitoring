@@ -12,7 +12,10 @@ class NotifikasiPage extends StatefulWidget {
 }
 
 class _NotifikasiPageState extends State<NotifikasiPage> {
-  List<Aktivitas> _listNotifikasi = aktivitasTerbaru;
+  // Hanya data dari server: daftar kosong berarti memang belum ada notifikasi
+  List<Aktivitas> _listNotifikasi = const [];
+  bool _memuat = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,20 +24,28 @@ class _NotifikasiPageState extends State<NotifikasiPage> {
   }
 
   Future<void> _fetchNotifikasi() async {
-    try {
-      final res = await AppRepository.getNotifikasi();
-      if (mounted) {
-        setState(() {
-          if (res.isSuccess && res.data != null && res.data!.isNotEmpty) {
-            _listNotifikasi = res.data!.map((m) => Aktivitas.fromModel(m)).toList();
-          }
-        });
+    final res = await AppRepository.getNotifikasi();
+    if (!mounted) return;
+    setState(() {
+      _memuat = false;
+      if (res.isSuccess) {
+        _error = null;
+        _listNotifikasi = (res.data ?? const []).map((m) => Aktivitas.fromModel(m)).toList();
+      } else {
+        _error = res.message;
       }
-    } catch (_) {}
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_memuat) {
+      return const Scaffold(
+        appBar: JudulAppBar(judul: 'Notifikasi'),
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
     return Scaffold(
       appBar: const JudulAppBar(judul: 'Notifikasi'),
       body: RefreshIndicator(
@@ -42,11 +53,13 @@ class _NotifikasiPageState extends State<NotifikasiPage> {
         child: _listNotifikasi.isEmpty
             ? ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
+                children: [
                   Padding(
-                    padding: EdgeInsets.only(top: 80),
-                    child: Center(
-                      child: Text('Belum ada notifikasi', style: TextStyle(color: AppColors.textGrey)),
+                    padding: const EdgeInsets.fromLTRB(24, 80, 24, 0),
+                    child: Text(
+                      _error == null ? 'Belum ada notifikasi' : 'Gagal memuat notifikasi.\n$_error',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.textGrey),
                     ),
                   ),
                 ],

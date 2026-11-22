@@ -86,7 +86,8 @@ class _OrangTuaDashboard extends StatefulWidget {
 
 class _OrangTuaDashboardState extends State<_OrangTuaDashboard> {
   Siswa _anak = daftarSiswa.first;
-  List<Catatan> _catatanAnak = daftarCatatan.take(3).toList();
+  // Hanya catatan dari server (bukan data dummy)
+  List<Catatan> _catatanAnak = const [];
 
   @override
   void initState() {
@@ -104,10 +105,9 @@ class _OrangTuaDashboardState extends State<_OrangTuaDashboard> {
             _anak = Siswa.fromModel(SiswaModel.fromJson(data['anak'][0]));
           }
           if (data['catatan_terbaru'] is List) {
-            final list = (data['catatan_terbaru'] as List)
+            _catatanAnak = (data['catatan_terbaru'] as List)
                 .map((c) => Catatan.fromModel(CatatanModel.fromJson(c)))
                 .toList();
-            if (list.isNotEmpty) _catatanAnak = list;
           }
         });
       }
@@ -208,15 +208,25 @@ class _OrangTuaDashboardState extends State<_OrangTuaDashboard> {
 
             SectionHeader(judul: 'Catatan Terbaru', onLihatSemua: () => widget.onKeTab(2)),
             const SizedBox(height: 12),
-            ListCard(
-              children: [
-                for (final c in _catatanAnak)
-                  CatatanTile(
-                    catatan: c,
-                    onKembali: _fetchDashboard,
-                  ),
-              ],
-            ),
+            if (_catatanAnak.isEmpty)
+              Container(
+                decoration: kartuDecoration(),
+                padding: const EdgeInsets.all(14),
+                child: const Text(
+                  'Belum ada catatan',
+                  style: TextStyle(fontSize: 13, color: AppColors.textGrey),
+                ),
+              )
+            else
+              ListCard(
+                children: [
+                  for (final c in _catatanAnak)
+                    CatatanTile(
+                      catatan: c,
+                      onKembali: _fetchDashboard,
+                    ),
+                ],
+              ),
           ],
         ),
       ),
