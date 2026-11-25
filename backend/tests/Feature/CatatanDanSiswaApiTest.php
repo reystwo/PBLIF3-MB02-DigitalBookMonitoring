@@ -213,7 +213,7 @@ class CatatanDanSiswaApiTest extends TestCase
     }
 
     /**
-     * Test 9: Endpoint /api/dashboard untuk Orang Tua.
+     * Test 9: Endpoint /api/dashboard untuk Orang Tua mengembalikan catatan_terbaru lengkap.
      */
     public function test_dashboard_endpoint_returns_valid_data_for_orang_tua(): void
     {
@@ -227,9 +227,29 @@ class CatatanDanSiswaApiTest extends TestCase
                     'nama_orang_tua',
                     'anak',
                     'statistik',
-                    'catatan_terbaru',
+                    'catatan_terbaru' => [
+                        '*' => [
+                            'id_catatan',
+                            'id_siswa',
+                            'nama_siswa',
+                            'penulis',
+                            'peran_penulis',
+                            'kategori',
+                            'isi_catatan',
+                            'isi',
+                            'tanggal',
+                            'tanggal_label',
+                            'status_dibaca',
+                            'siswa' => ['id_siswa', 'nama', 'kelas', 'jenis_kelamin', 'perempuan'],
+                            'lampiran',
+                        ],
+                    ],
                 ],
-            ]);
+            ])
+            ->assertJsonPath('data.catatan_terbaru.0.penulis', 'Bapak Ahmad')
+            ->assertJsonPath('data.catatan_terbaru.0.peran_penulis', 'Guru Kelas 7A')
+            ->assertJsonPath('data.catatan_terbaru.0.siswa.nama', 'Ahmad Rizki')
+            ->assertJsonPath('data.catatan_terbaru.0.lampiran.nama_file', 'Foto_Tugas_Matematika.jpg');
     }
 
     /**

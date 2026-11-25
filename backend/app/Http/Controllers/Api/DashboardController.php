@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\FormatCatatan;
 use App\Http\Controllers\Controller;
 use App\Models\CatatanPenghubung;
 use App\Models\Guru;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    use FormatCatatan;
     /**
      * Dapatkan data ringkasan dashboard sesuai role yang sedang login.
      */
@@ -34,7 +36,7 @@ class DashboardController extends Controller
                 ->where('status_dibaca', 'belum_dibaca')
                 ->count();
 
-            $catatanTerbaru = CatatanPenghubung::with(['siswa', 'pengirim', 'penerima'])
+            $catatanTerbaru = CatatanPenghubung::with(self::RELASI_CATATAN)
                 ->where(function ($q) use ($user, $kelasWaliIds) {
                     $q->where('id_pengirim', $user->id_user)
                         ->orWhere('id_penerima', $user->id_user)
@@ -43,9 +45,10 @@ class DashboardController extends Controller
                         });
                 })
                 ->orderBy('tanggal', 'DESC')
+                ->orderBy('id_catatan', 'DESC')
                 ->limit(5)
                 ->get()
-                ->map(fn ($c) => $this->formatMiniCatatan($c));
+                ->map(fn ($c) => $this->formatDashboardCatatan($c));
 
             return response()->json([
                 'success' => true,
@@ -87,12 +90,13 @@ class DashboardController extends Controller
                 ->where('status_dibaca', 'belum_dibaca')
                 ->count();
 
-            $catatanTerbaru = CatatanPenghubung::with(['siswa', 'pengirim'])
+            $catatanTerbaru = CatatanPenghubung::with(self::RELASI_CATATAN)
                 ->whereIn('id_siswa', $anakIds)
                 ->orderBy('tanggal', 'DESC')
+                ->orderBy('id_catatan', 'DESC')
                 ->limit(5)
                 ->get()
-                ->map(fn ($c) => $this->formatMiniCatatan($c));
+                ->map(fn ($c) => $this->formatDashboardCatatan($c));
 
             return response()->json([
                 'success' => true,
@@ -194,19 +198,15 @@ class DashboardController extends Controller
     }
 
     /**
-     * Helper mini formatter catatan
+     * Format lengkap catatan untuk dashboard agar konsisten dengan /api/catatan
+     * (peran_penulis, objek siswa, dan lampiran ikut terisi), sekaligus menjaga
+     * field nama_siswa untuk kompatibilitas aktivitas dashboard guru.
      */
-    private function formatMiniCatatan(CatatanPenghubung $c): array
+    private function formatDashboardCatatan(CatatanPenghubung $c): array
     {
         return [
-            'id_catatan' => $c->id_catatan,
-            'id_siswa' => $c->id_siswa,
+            ...$this->formatCatatanItem($c),
             'nama_siswa' => $c->siswa?->nama ?? '',
-            'penulis' => $c->pengirim?->nama ?? '',
-            'kategori' => $c->kategori ?? 'Umum',
-            'isi' => $c->isi_catatan,
-            'tanggal' => $c->tanggal?->format('Y-m-d H:i:s'),
-            'status_dibaca' => $c->status_dibaca,
         ];
     }
 }

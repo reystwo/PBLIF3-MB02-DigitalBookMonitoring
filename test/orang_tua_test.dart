@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:digital_book_connect/models/orang_tua_models.dart';
+import 'package:digital_book_connect/screens/catatan/detail_catatan_page.dart';
 import 'package:digital_book_connect/screens/orang_tua/orang_tua_main_page.dart';
 import 'package:digital_book_connect/screens/orang_tua/profil_anak_page.dart';
 import 'package:digital_book_connect/services/api_service.dart';
@@ -231,6 +232,72 @@ void main() {
 
       expect(find.byType(ProfilAnakPage), findsOneWidget);
       expect(find.text('Rafa Aditya Saputra'), findsOneWidget);
+    });
+
+    testWidgets('catatan terbaru di dashboard menampilkan peran Guru & lampiran saat dibuka', (tester) async {
+      final dashboardDenganCatatan = ApiResponse<Map<String, dynamic>>(
+        success: true,
+        message: 'ok',
+        statusCode: 200,
+        data: {
+          'catatan_terbaru': [
+            {
+              'id_catatan': 1,
+              'id_siswa': 9,
+              'id_pengirim': 14,
+              'id_penerima': 15,
+              'nama_siswa': 'Rafa Aditya Saputra',
+              'penulis': 'Bapak Ahmad Fauzi, S.Pd',
+              'peran_penulis': 'Guru Kelas 7A',
+              'penulis_perempuan': false,
+              'kategori': 'Akademik',
+              'isi_catatan': 'Ananda Rafa meningkat di Matematika.',
+              'isi': 'Ananda Rafa meningkat di Matematika.',
+              'tanggal': '2026-11-25 09:00:00',
+              'tanggal_label': '25 Nov 2026',
+              'status_dibaca': 'belum_dibaca',
+              'siswa': {
+                'id_siswa': 9,
+                'nama': 'Rafa Aditya Saputra',
+                'kelas': '7A',
+                'jenis_kelamin': 'L',
+                'perempuan': false,
+              },
+              'lampiran': {
+                'nama_file': 'Foto_Tugas_Matematika.jpg',
+                'ukuran': '1.2 MB',
+              },
+            },
+          ],
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: OrangTuaMainPage(
+          muatAnak: () async => _sukses([_rafaJson]),
+          muatDashboard: () async => dashboardDenganCatatan,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Gulir ke bagian Catatan Terbaru agar item di bawah ListView terbangun
+      final tileCatatan = find.textContaining('Catatan: Ananda Rafa meningkat di Matematika.');
+      await tester.scrollUntilVisible(tileCatatan, 300, scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+
+      // Label di dashboard harus "Catatan: ..." dengan peran "(Guru)", bukan "(Pengguna)" / "Membalas:"
+      expect(tileCatatan, findsOneWidget);
+      expect(find.textContaining('Membalas:'), findsNothing);
+      expect(find.textContaining('(Pengguna)'), findsNothing);
+
+      // Saat dibuka ke DetailCatatanPage, peran penulis dan lampiran tampil lengkap
+      await tester.tap(tileCatatan);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DetailCatatanPage), findsOneWidget);
+      expect(find.text('Guru Kelas 7A'), findsOneWidget);
+      expect(find.text('Foto_Tugas_Matematika.jpg'), findsOneWidget);
+      expect(find.text('1.2 MB'), findsOneWidget);
     });
   });
 }
