@@ -24,7 +24,7 @@ trait FormatCatatan
         7 => 'Jul', 8 => 'Agu', 9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
     ];
 
-    protected function formatCatatanItem(CatatanPenghubung $c): array
+    protected function formatCatatanItem(CatatanPenghubung $c, bool $sertakanBalasan = false): array
     {
         $pengirimUser = $c->pengirim;
         $peranPenulis = 'Pengguna';
@@ -44,8 +44,13 @@ trait FormatCatatan
         $tglStr = $tanggalObj->format('Y-m-d H:i:s');
         $labelTanggal = "{$tanggalObj->day} " . (self::BULAN_ID[$tanggalObj->month] ?? '') . " {$tanggalObj->year}";
 
-        return [
+        $jumlahBalasan = $c->relationLoaded('balasan')
+            ? $c->balasan->count()
+            : (int) ($c->balasan_count ?? 0);
+
+        $item = [
             'id_catatan' => $c->id_catatan,
+            'parent_id' => $c->parent_id,
             'id_siswa' => $c->id_siswa,
             'id_pengirim' => $c->id_pengirim,
             'id_penerima' => $c->id_penerima,
@@ -60,6 +65,7 @@ trait FormatCatatan
             'created_at' => ($c->created_at ?? $tanggalObj)->format('Y-m-d H:i:s'),
             'updated_at' => ($c->updated_at ?? $c->created_at ?? $tanggalObj)->format('Y-m-d H:i:s'),
             'status_dibaca' => $c->status_dibaca,
+            'jumlah_balasan' => $jumlahBalasan,
             'siswa' => [
                 'id_siswa' => $c->siswa?->id_siswa ?? $c->id_siswa,
                 'nama' => $c->siswa?->nama ?? '',
@@ -72,5 +78,13 @@ trait FormatCatatan
                 'ukuran' => $c->lampiran_ukuran ?? '1.0 MB',
             ] : null,
         ];
+
+        if ($sertakanBalasan) {
+            $item['balasan'] = $c->relationLoaded('balasan')
+                ? $c->balasan->map(fn (CatatanPenghubung $b) => $this->formatCatatanItem($b))->values()->all()
+                : [];
+        }
+
+        return $item;
     }
 }

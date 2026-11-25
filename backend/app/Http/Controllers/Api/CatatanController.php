@@ -22,7 +22,12 @@ class CatatanController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = CatatanPenghubung::with(self::RELASI_CATATAN);
+        $query = CatatanPenghubung::with(self::RELASI_CATATAN)->withCount('balasan');
+
+        // Jika diminta hanya catatan induk (mode thread), sembunyikan record balasan dari daftar utama
+        if ($request->boolean('hanya_induk')) {
+            $query->whereNull('parent_id');
+        }
 
         // Proteksi Privasi Wajib SEC-02:
         if ($user->role === 'orang_tua') {
@@ -62,9 +67,16 @@ class CatatanController extends Controller
             });
         }
 
-        $daftarCatatan = $query->orderBy('tanggal', 'DESC')
-            ->orderBy('id_catatan', 'DESC')
-            ->get();
+        if ($request->boolean('hanya_induk')) {
+            // Urutkan thread berdasarkan aktivitas terakhir (balasan terbaru atau tanggal catatan induk)
+            $query->orderByRaw(
+                'COALESCE((SELECT MAX(b.tanggal) FROM catatan_penghubung b WHERE b.parent_id = catatan_penghubung.id_catatan), catatan_penghubung.tanggal) DESC'
+            );
+        } else {
+            $query->orderBy('tanggal', 'DESC');
+        }
+
+        $daftarCatatan = $query->orderBy('id_catatan', 'DESC')->get();
 
         $data = $daftarCatatan->map(fn ($c) => $this->formatCatatanItem($c));
 
@@ -82,7 +94,10 @@ class CatatanController extends Controller
     public function show(Request $request, int|string $id): JsonResponse
     {
         $user = $request->user();
-        $catatan = CatatanPenghubung::with(self::RELASI_CATATAN)->find($id);
+        $catatan = CatatanPenghubung::with([
+            ...self::RELASI_CATATAN,
+            'balasan' => fn ($q) => $q->with(self::RELASI_CATATAN),
+        ])->find($id);
 
         if (! $catatan) {
             return response()->json([
@@ -100,16 +115,30 @@ class CatatanController extends Controller
             return $this->ditolak('Akses ditolak. Anda tidak berhak melihat catatan siswa ini.');
         }
 
-        // Tandai dibaca jika user saat ini adalah penerima catatan
+        // Tandai dibaca jika user saat ini adalah penerima catatan induk
         if ((int) $catatan->id_penerima === (int) $user->id_user && $catatan->status_dibaca === 'belum_dibaca') {
             $catatan->update(['status_dibaca' => 'dibaca']);
             $catatan->status_dibaca = 'dibaca';
         }
 
+        // Tandai juga balasan di dalam thread yang ditujukan ke user saat ini sebagai dibaca
+        $idBalasanBelumDibaca = $catatan->balasan
+            ->filter(fn (CatatanPenghubung $b) => (int) $b->id_penerima === (int) $user->id_user && $b->status_dibaca === 'belum_dibaca')
+            ->pluck('id_catatan');
+
+        if ($idBalasanBelumDibaca->isNotEmpty()) {
+            CatatanPenghubung::whereIn('id_catatan', $idBalasanBelumDibaca)->update(['status_dibaca' => 'dibaca']);
+            $catatan->balasan->each(function (CatatanPenghubung $b) use ($idBalasanBelumDibaca) {
+                if ($idBalasanBelumDibaca->contains($b->id_catatan)) {
+                    $b->status_dibaca = 'dibaca';
+                }
+            });
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Detail catatan berhasil dimuat',
-            'data' => $this->formatCatatanItem($catatan),
+            'data' => $this->formatCatatanItem($catatan, sertakanBalasan: true),
         ], 200);
     }
 
@@ -266,8 +295,12 @@ class CatatanController extends Controller
             $catatanAsal->update(['status_dibaca' => 'dibaca']);
         }
 
+        // Arahkan balasan ke catatan induk (thread 1 level agar seluruh percakapan tetap menyatu)
+        $idInduk = $catatanAsal->parent_id ?? $catatanAsal->id_catatan;
+
         // Buat record balasan di catatan_penghubung
         $balasan = CatatanPenghubung::create([
+            'parent_id' => $idInduk,
             'id_siswa' => $catatanAsal->id_siswa,
             'id_pengirim' => $user->id_user,
             'id_penerima' => $idPenerima,

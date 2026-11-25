@@ -37,6 +37,8 @@ class DashboardController extends Controller
                 ->count();
 
             $catatanTerbaru = CatatanPenghubung::with(self::RELASI_CATATAN)
+                ->withCount('balasan')
+                ->whereNull('parent_id')
                 ->where(function ($q) use ($user, $kelasWaliIds) {
                     $q->where('id_pengirim', $user->id_user)
                         ->orWhere('id_penerima', $user->id_user)
@@ -44,7 +46,9 @@ class DashboardController extends Controller
                             $sq->whereIn('id_kelas', $kelasWaliIds);
                         });
                 })
-                ->orderBy('tanggal', 'DESC')
+                ->orderByRaw(
+                    'COALESCE((SELECT MAX(b.tanggal) FROM catatan_penghubung b WHERE b.parent_id = catatan_penghubung.id_catatan), catatan_penghubung.tanggal) DESC'
+                )
                 ->orderBy('id_catatan', 'DESC')
                 ->limit(5)
                 ->get()
@@ -91,8 +95,12 @@ class DashboardController extends Controller
                 ->count();
 
             $catatanTerbaru = CatatanPenghubung::with(self::RELASI_CATATAN)
+                ->withCount('balasan')
+                ->whereNull('parent_id')
                 ->whereIn('id_siswa', $anakIds)
-                ->orderBy('tanggal', 'DESC')
+                ->orderByRaw(
+                    'COALESCE((SELECT MAX(b.tanggal) FROM catatan_penghubung b WHERE b.parent_id = catatan_penghubung.id_catatan), catatan_penghubung.tanggal) DESC'
+                )
                 ->orderBy('id_catatan', 'DESC')
                 ->limit(5)
                 ->get()

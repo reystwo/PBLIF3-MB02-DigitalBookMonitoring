@@ -345,4 +345,71 @@ class CatatanDanSiswaApiTest extends TestCase
         // Status baca pesan pertama tetap belum_dibaca (karena belum dibaca oleh guru)
         $this->assertEquals('belum_dibaca', $pesanSendiri->fresh()->status_dibaca);
     }
+
+    /**
+     * Test 12: Thread balasan (parent_id) — balasan terikat ke catatan induk,
+     * tampil berurutan kronologis pada GET /api/catatan/{id}, ikut ditandai dibaca saat dibuka,
+     * dan GET /api/catatan?hanya_induk=1 hanya menampilkan catatan induk beserta jumlah_balasan.
+     */
+    public function test_replies_form_thread_under_parent_note_and_filter_root_notes(): void
+    {
+        $siswaAhmad = Siswa::where('nama', 'Ahmad Rizki')->firstOrFail();
+
+        // 1. Guru membuat catatan induk
+        $induk = CatatanPenghubung::create([
+            'id_siswa' => $siswaAhmad->id_siswa,
+            'id_pengirim' => $this->guru->id_user,
+            'id_penerima' => $this->ortuAhmad->id_user,
+            'kategori' => 'Akademik',
+            'tanggal' => now()->subHours(2),
+            'isi_catatan' => 'Catatan induk dari guru.',
+            'status_dibaca' => 'belum_dibaca',
+        ]);
+
+        // 2. Orang tua membalas catatan induk -> parent_id = induk
+        $balasOrtu = $this->withHeader('Authorization', 'Bearer ' . $this->ortuAhmadToken)
+            ->postJson("/api/catatan/{$induk->id_catatan}/balas", [
+                'isi_catatan' => 'Balasan pertama dari orang tua.',
+            ]);
+
+        $balasOrtu->assertStatus(201)
+            ->assertJsonPath('data.parent_id', $induk->id_catatan);
+        $idBalasan1 = $balasOrtu->json('data.id_catatan');
+
+        // 3. Guru membalas balasan orang tua -> tetap flat 1-level thread (parent_id = induk)
+        $this->app['auth']->forgetGuards();
+        $balasGuru = $this->withHeader('Authorization', 'Bearer ' . $this->guruToken)
+            ->postJson("/api/catatan/{$idBalasan1}/balas", [
+                'isi_catatan' => 'Balasan kedua dari guru.',
+            ]);
+
+        $balasGuru->assertStatus(201)
+            ->assertJsonPath('data.parent_id', $induk->id_catatan);
+
+        // 4. GET /api/catatan/{induk} oleh Orang Tua mengembalikan 2 balasan urut kronologis
+        //    dan menandai balasan kedua (dari guru ke ortu) sebagai 'dibaca'
+        $this->app['auth']->forgetGuards();
+        $detail = $this->withHeader('Authorization', 'Bearer ' . $this->ortuAhmadToken)
+            ->getJson("/api/catatan/{$induk->id_catatan}");
+
+        $detail->assertStatus(200)
+            ->assertJsonPath('data.jumlah_balasan', 2)
+            ->assertJsonCount(2, 'data.balasan')
+            ->assertJsonPath('data.balasan.0.isi', 'Balasan pertama dari orang tua.')
+            ->assertJsonPath('data.balasan.1.isi', 'Balasan kedua dari guru.')
+            ->assertJsonPath('data.balasan.1.status_dibaca', 'dibaca');
+
+        // 5. GET /api/catatan?hanya_induk=1 tidak menampilkan record balasan sebagai item terpisah
+        $listInduk = $this->withHeader('Authorization', 'Bearer ' . $this->ortuAhmadToken)
+            ->getJson('/api/catatan?hanya_induk=1');
+
+        $listInduk->assertStatus(200);
+        $ids = array_column($listInduk->json('data'), 'id_catatan');
+        $this->assertContains($induk->id_catatan, $ids);
+        $this->assertNotContains($idBalasan1, $ids);
+
+        // Catatan induk dengan aktivitas balasan terbaru muncul paling atas
+        $this->assertEquals($induk->id_catatan, $listInduk->json('data.0.id_catatan'));
+        $this->assertEquals(2, $listInduk->json('data.0.jumlah_balasan'));
+    }
 }

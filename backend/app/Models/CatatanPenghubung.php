@@ -20,6 +20,7 @@ class CatatanPenghubung extends Model
     public const KATEGORI = ['Akademik', 'Perilaku', 'Kesehatan', 'Kegiatan', 'Lainnya', 'Umum'];
 
     protected $fillable = [
+        'parent_id',
         'id_siswa',
         'id_pengirim',
         'id_penerima',
@@ -35,6 +36,7 @@ class CatatanPenghubung extends Model
     {
         return [
             'id_catatan' => 'integer',
+            'parent_id' => 'integer',
             'id_siswa' => 'integer',
             'id_pengirim' => 'integer',
             'id_penerima' => 'integer',
@@ -55,6 +57,24 @@ class CatatanPenghubung extends Model
                 ->orWhere('id_penerima', $user->id_user)
                 ->orWhereHas('siswa', fn ($sq) => $sq->tanggungJawabGuru($user->guru));
         });
+    }
+
+    /**
+     * Catatan induk jika record ini merupakan balasan dalam thread.
+     */
+    public function induk()
+    {
+        return $this->belongsTo(self::class, 'parent_id', 'id_catatan');
+    }
+
+    /**
+     * Daftar balasan di bawah catatan induk ini, berurutan kronologis (terlama ke terbaru).
+     */
+    public function balasan()
+    {
+        return $this->hasMany(self::class, 'parent_id', 'id_catatan')
+            ->orderBy('tanggal', 'ASC')
+            ->orderBy('id_catatan', 'ASC');
     }
 
     /**

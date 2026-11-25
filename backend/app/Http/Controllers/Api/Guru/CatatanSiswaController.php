@@ -25,6 +25,8 @@ class CatatanSiswaController extends GuruController
         $this->pastikanTanggungJawab($request, $siswa);
 
         $paginator = CatatanPenghubung::with(self::RELASI_CATATAN)
+            ->withCount('balasan')
+            ->whereNull('parent_id')
             ->where('id_siswa', $siswa->id_siswa)
             ->dapatDiaksesGuru($request->user())
             ->orderByDesc('created_at')
