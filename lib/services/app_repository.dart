@@ -129,11 +129,13 @@ class AppRepository {
     int? idSiswa,
     String? kategori,
     String? search,
+    bool hanyaInduk = false,
   }) async {
     final params = <String, String>{};
     if (idSiswa != null) params['id_siswa'] = idSiswa.toString();
     if (kategori != null && kategori.isNotEmpty) params['kategori'] = kategori;
     if (search != null && search.isNotEmpty) params['search'] = search;
+    if (hanyaInduk) params['hanya_induk'] = '1';
 
     final res = await ApiService.get('/catatan', queryParams: params);
     if (res.success && res.data is List) {

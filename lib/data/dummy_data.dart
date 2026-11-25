@@ -62,6 +62,7 @@ class Lampiran {
 
 class Catatan {
   final int? idCatatan;
+  final int? parentId;
   final int? idPengirim;
   final String penulis;
   final String peranPenulis; // contoh: "Guru Kelas 7A" / "Orang Tua"
@@ -71,9 +72,12 @@ class Catatan {
   final DateTime tanggal;
   final String isi;
   final Lampiran? lampiran;
+  final int jumlahBalasan;
+  final List<Catatan> balasan;
 
   const Catatan({
     this.idCatatan,
+    this.parentId,
     this.idPengirim,
     required this.penulis,
     required this.peranPenulis,
@@ -83,11 +87,15 @@ class Catatan {
     required this.isi,
     this.penulisPerempuan = false,
     this.lampiran,
+    this.jumlahBalasan = 0,
+    this.balasan = const [],
   });
 
   factory Catatan.fromModel(CatatanModel model) {
+    final daftarBalasan = model.balasan.map(Catatan.fromModel).toList();
     return Catatan(
       idCatatan: model.idCatatan,
+      parentId: model.parentId,
       idPengirim: model.idPengirim,
       penulis: model.penulis,
       peranPenulis: model.peranPenulis,
@@ -102,6 +110,31 @@ class Catatan {
               ukuran: model.lampiran!.ukuran,
             )
           : null,
+      jumlahBalasan: model.jumlahBalasan > daftarBalasan.length
+          ? model.jumlahBalasan
+          : daftarBalasan.length,
+      balasan: daftarBalasan,
+    );
+  }
+
+  Catatan copyWith({
+    int? jumlahBalasan,
+    List<Catatan>? balasan,
+  }) {
+    return Catatan(
+      idCatatan: idCatatan,
+      parentId: parentId,
+      idPengirim: idPengirim,
+      penulis: penulis,
+      peranPenulis: peranPenulis,
+      penulisPerempuan: penulisPerempuan,
+      siswa: siswa,
+      kategori: kategori,
+      tanggal: tanggal,
+      isi: isi,
+      lampiran: lampiran,
+      jumlahBalasan: jumlahBalasan ?? this.jumlahBalasan,
+      balasan: balasan ?? this.balasan,
     );
   }
 

@@ -28,7 +28,7 @@ class _RiwayatCatatanPageState extends State<RiwayatCatatanPage> {
   }
 
   Future<void> _fetchCatatan() async {
-    final res = await AppRepository.getCatatan();
+    final res = await AppRepository.getCatatan(hanyaInduk: true);
     if (!mounted) return;
     setState(() {
       _memuat = false;
@@ -121,7 +121,9 @@ class CatatanTile extends StatelessWidget {
       subjudul: tampilkanSiswa
           ? '${catatan.siswa.nama} · ${catatan.isi}'
           : '$awalan: ${catatan.isi}',
-      keterangan: formatTanggal(catatan.tanggal),
+      keterangan: catatan.jumlahBalasan > 0
+          ? '${formatTanggal(catatan.tanggal)} · ${catatan.jumlahBalasan} balasan'
+          : formatTanggal(catatan.tanggal),
       onTap: () async {
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => DetailCatatanPage(catatan: catatan)),

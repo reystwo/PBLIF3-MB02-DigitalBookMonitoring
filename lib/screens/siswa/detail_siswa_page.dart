@@ -309,7 +309,8 @@ class KartuRiwayatCatatan extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Dibuat ${formatWaktu(dibuat)}'
-                      '${tanggalBerbeda ? ' · untuk tanggal ${formatTanggal(catatan.tanggal)}' : ''}',
+                      '${tanggalBerbeda ? ' · untuk tanggal ${formatTanggal(catatan.tanggal)}' : ''}'
+                      '${catatan.jumlahBalasan > 0 ? ' · ${catatan.jumlahBalasan} balasan' : ''}',
                       style: const TextStyle(fontSize: 11.5, color: AppColors.textGrey),
                     ),
                   ),

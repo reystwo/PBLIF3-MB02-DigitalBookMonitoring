@@ -335,5 +335,67 @@ void main() {
       expect(find.text('Pesan lanjutan untuk Rafa Aditya Saputra'), findsOneWidget);
       expect(find.text('Balas ke Bapak Andi Saputra'), findsNothing);
     });
+
+    testWidgets('menampilkan thread balasan di bawah catatan induk dan langsung menambah balasan baru', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(idCatatan: 10),
+          muatDetail: (_) async => ApiResponse(
+            success: true,
+            message: 'Detail catatan berhasil dimuat',
+            statusCode: 200,
+            data: CatatanModel.fromJson({
+              'id_catatan': 10,
+              'parent_id': null,
+              'id_siswa': 9,
+              'id_pengirim': 14,
+              'id_penerima': 15,
+              'penulis': 'Bapak Ahmad',
+              'peran_penulis': 'Guru Kelas 7A',
+              'kategori': 'Akademik',
+              'isi_catatan': 'Ananda Rafa sangat aktif hari ini.',
+              'tanggal': '2026-11-25 09:00:00',
+              'jumlah_balasan': 1,
+              'siswa': {'id_siswa': 9, 'nama': 'Rafa Aditya Saputra', 'kelas': '7A', 'jenis_kelamin': 'L'},
+              'balasan': [
+                {
+                  'id_catatan': 11,
+                  'parent_id': 10,
+                  'id_siswa': 9,
+                  'id_pengirim': 15,
+                  'id_penerima': 14,
+                  'penulis': 'Bapak Andi Saputra',
+                  'peran_penulis': 'Orang Tua',
+                  'kategori': 'Akademik',
+                  'isi_catatan': 'Terima kasih atas infonya Pak.',
+                  'tanggal': '2026-11-25 10:15:00',
+                  'siswa': {'id_siswa': 9, 'nama': 'Rafa Aditya Saputra', 'kelas': '7A', 'jenis_kelamin': 'L'},
+                },
+              ],
+            }),
+          ),
+          kirimBalasan: ({required idCatatan, required isi}) async => ApiResponse(
+            success: true,
+            message: 'Balasan berhasil dikirim',
+            statusCode: 201,
+            data: buatBalasanModel(isi),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Thread balasan dari server tampil di bawah catatan induk
+      expect(find.text('Balasan (1)'), findsOneWidget);
+      expect(find.text('Terima kasih atas infonya Pak.'), findsOneWidget);
+
+      // Kirim balasan baru -> langsung muncul di thread (menjadi 2 balasan)
+      await bukaSheetBalas(tester);
+      await tester.enterText(find.byKey(const Key('input-balasan')), 'Akan kami pantau PR-nya di rumah.');
+      await tester.tap(find.text('Kirim'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Balasan (2)'), findsOneWidget);
+      expect(find.text('Akan kami pantau PR-nya di rumah.'), findsOneWidget);
+    });
   });
 }

@@ -26,6 +26,7 @@ class LampiranModel {
 
 class CatatanModel {
   final int idCatatan;
+  final int? parentId;
   final int idSiswa;
   final int idPengirim;
   final int idPenerima;
@@ -41,9 +42,12 @@ class CatatanModel {
   final LampiranModel? lampiran;
   // Waktu catatan disimpan di server (created_at); null pada data lama/dummy
   final DateTime? dibuatPada;
+  final int jumlahBalasan;
+  final List<CatatanModel> balasan;
 
   const CatatanModel({
     required this.idCatatan,
+    this.parentId,
     required this.idSiswa,
     required this.idPengirim,
     required this.idPenerima,
@@ -58,6 +62,8 @@ class CatatanModel {
     required this.siswa,
     this.lampiran,
     this.dibuatPada,
+    this.jumlahBalasan = 0,
+    this.balasan = const [],
   });
 
   factory CatatanModel.fromJson(Map<String, dynamic> json) {
@@ -86,10 +92,28 @@ class CatatanModel {
       );
     }
 
+    final balasanParsed = json['balasan'] is List
+        ? (json['balasan'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(CatatanModel.fromJson)
+            .toList()
+        : const <CatatanModel>[];
+
+    final parsedParentId = json['parent_id'] == null
+        ? null
+        : (json['parent_id'] is int
+            ? json['parent_id'] as int
+            : int.tryParse(json['parent_id'].toString()));
+
+    final parsedJumlahBalasan = json['jumlah_balasan'] is int
+        ? json['jumlah_balasan'] as int
+        : int.tryParse(json['jumlah_balasan']?.toString() ?? '') ?? balasanParsed.length;
+
     return CatatanModel(
       idCatatan: json['id_catatan'] is int
           ? json['id_catatan']
           : int.tryParse(json['id_catatan']?.toString() ?? '0') ?? 0,
+      parentId: parsedParentId,
       idSiswa: json['id_siswa'] is int
           ? json['id_siswa']
           : int.tryParse(json['id_siswa']?.toString() ?? '0') ?? 0,
@@ -111,6 +135,8 @@ class CatatanModel {
       siswa: SiswaModel.fromJson(siswaJson),
       lampiran: lampiranParsed,
       dibuatPada: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      jumlahBalasan: parsedJumlahBalasan,
+      balasan: balasanParsed,
     );
   }
 }

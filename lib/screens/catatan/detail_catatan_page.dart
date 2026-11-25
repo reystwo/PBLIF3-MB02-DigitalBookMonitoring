@@ -81,7 +81,7 @@ class _DetailCatatanPageState extends State<DetailCatatanPage> {
   }
 
   Future<void> _balasPesan(BuildContext context) async {
-    final pesanBerhasil = await showModalBottomSheet<String>(
+    final hasil = await showModalBottomSheet<({String pesan, CatatanModel? balasan})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
@@ -95,15 +95,27 @@ class _DetailCatatanPageState extends State<DetailCatatanPage> {
       ),
     );
 
-    if (pesanBerhasil != null && context.mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(pesanBerhasil),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+    if (hasil != null && mounted) {
+      if (hasil.balasan != null) {
+        final balasanBaru = Catatan.fromModel(hasil.balasan!);
+        final daftarBaru = [..._catatan.balasan, balasanBaru];
+        setState(() {
+          _catatan = _catatan.copyWith(
+            balasan: daftarBaru,
+            jumlahBalasan: daftarBaru.length,
+          );
+        });
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(hasil.pesan),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+      }
     }
   }
 
@@ -236,7 +248,39 @@ class _DetailCatatanPageState extends State<DetailCatatanPage> {
               ),
             ),
           ],
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
+
+          // Thread Balasan di bawah catatan induk
+          _Judul(
+            catatan.balasan.isEmpty
+                ? 'Balasan'
+                : 'Balasan (${catatan.balasan.length})',
+          ),
+          const SizedBox(height: 10),
+          if (catatan.balasan.isEmpty)
+            Container(
+              decoration: kartuDecoration(),
+              padding: const EdgeInsets.all(14),
+              child: const Text(
+                'Belum ada balasan. Tekan tombol di bawah untuk membalas.',
+                style: TextStyle(fontSize: 13, color: AppColors.textGrey),
+              ),
+            )
+          else
+            Column(
+              children: [
+                for (var i = 0; i < catatan.balasan.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 10),
+                  _KartuBalasan(
+                    balasan: catatan.balasan[i],
+                    milikSendiri: _idUserLogin != null &&
+                        catatan.balasan[i].idPengirim != null &&
+                        catatan.balasan[i].idPengirim == _idUserLogin,
+                  ),
+                ],
+              ],
+            ),
+          const SizedBox(height: 24),
 
           TombolUtama(
             label: _pesanSendiri ? 'Tulis Pesan Lanjutan' : 'Balas Pesan',
@@ -264,6 +308,106 @@ class _Judul extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w700,
         color: AppColors.textDark,
+      ),
+    );
+  }
+}
+
+class _KartuBalasan extends StatelessWidget {
+  final Catatan balasan;
+  final bool milikSendiri;
+
+  const _KartuBalasan({
+    required this.balasan,
+    required this.milikSendiri,
+  });
+
+  String _formatWaktu(DateTime t) {
+    final jam = t.hour.toString().padLeft(2, '0');
+    final menit = t.minute.toString().padLeft(2, '0');
+    return '${formatTanggal(t)}, $jam:$menit';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: balasan.idCatatan != null ? Key('balasan-${balasan.idCatatan}') : null,
+      decoration: BoxDecoration(
+        color: milikSendiri ? AppColors.primaryLight.withValues(alpha: 0.45) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: milikSendiri ? AppColors.primary.withValues(alpha: 0.35) : AppColors.divider,
+        ),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppAvatar(
+                radius: 18,
+                perempuan: balasan.penulisPerempuan,
+                backgroundColor: milikSendiri ? Colors.white : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            balasan.penulis,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                        if (milikSendiri) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Anda',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      balasan.peranPenulis,
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textGrey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            balasan.isi,
+            style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, height: 1.45),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatWaktu(balasan.tanggal),
+            style: const TextStyle(fontSize: 11.5, color: AppColors.textGrey),
+          ),
+        ],
       ),
     );
   }
@@ -330,7 +474,7 @@ class _SheetBalasPesanState extends State<_SheetBalasPesan> {
 
     if (res.isSuccess) {
       final pesan = res.message.isNotEmpty ? res.message : 'Balasan berhasil dikirim';
-      Navigator.of(context).pop(pesan);
+      Navigator.of(context).pop((pesan: pesan, balasan: res.data));
     } else {
       setState(() {
         _mengirim = false;
