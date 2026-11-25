@@ -212,5 +212,81 @@ void main() {
       expect(find.textContaining('Data catatan tidak valid'), findsOneWidget);
       expect(find.text('Balasan berhasil dikirim'), findsNothing);
     });
+
+    testWidgets('membuka DetailCatatanPage memanggil GET /api/catatan/{id} dan memperbarui data terbaru', (tester) async {
+      Uri? requestedUri;
+      String? requestedMethod;
+
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(
+          home: DetailCatatanPage(catatan: buatCatatan(idCatatan: 10)),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(requestedMethod, 'GET');
+        expect(requestedUri?.path, endsWith('/catatan/10'));
+        expect(find.text('Isi terbaru dari server setelah dibaca.'), findsOneWidget);
+        expect(find.text('Laporan_Harian.pdf'), findsOneWidget);
+      }, () => MockClient((req) async {
+            requestedMethod = req.method;
+            requestedUri = req.url;
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'message': 'Detail catatan berhasil dimuat',
+                'data': {
+                  'id_catatan': 10,
+                  'id_siswa': 9,
+                  'id_pengirim': 14,
+                  'id_penerima': 15,
+                  'penulis': 'Bapak Ahmad',
+                  'peran_penulis': 'Guru Kelas 7A',
+                  'kategori': 'Akademik',
+                  'isi_catatan': 'Isi terbaru dari server setelah dibaca.',
+                  'isi': 'Isi terbaru dari server setelah dibaca.',
+                  'tanggal': '2026-11-25 09:00:00',
+                  'tanggal_label': '25 Nov 2026',
+                  'status_dibaca': 'dibaca',
+                  'siswa': {'id_siswa': 9, 'nama': 'Rafa Aditya Saputra', 'kelas': '7A', 'jenis_kelamin': 'L'},
+                  'lampiran': {'nama_file': 'Laporan_Harian.pdf', 'ukuran': '0.5 MB'},
+                },
+              }),
+              200,
+            );
+          }));
+    });
+
+    testWidgets('gagal memuat detail tetap menampilkan data awal tanpa error layar kosong', (tester) async {
+      var dipanggilDengan = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(idCatatan: 10),
+          muatDetail: (id) async {
+            dipanggilDengan = id;
+            return const ApiResponse(success: false, message: 'Server error', statusCode: 500);
+          },
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(dipanggilDengan, 10);
+      expect(find.text('Ananda Rafa sangat aktif hari ini.'), findsOneWidget);
+    });
+
+    testWidgets('idCatatan null tidak memanggil muatDetail', (tester) async {
+      var dipanggil = false;
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(idCatatan: null),
+          muatDetail: (_) async {
+            dipanggil = true;
+            return ApiResponse(success: true, message: 'OK', data: buatBalasanModel('x'), statusCode: 200);
+          },
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(dipanggil, isFalse);
+    });
   });
 }

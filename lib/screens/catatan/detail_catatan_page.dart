@@ -9,17 +9,63 @@ import 'package:digital_book_connect/widgets/app_widgets.dart';
 import 'package:digital_book_connect/services/api_service.dart';
 import 'package:digital_book_connect/services/app_repository.dart';
 
+typedef MuatDetailCatatan = Future<ApiResponse<CatatanModel>> Function(int idCatatan);
+
 typedef KirimBalasan = Future<ApiResponse<CatatanModel>> Function({
   required int idCatatan,
   required String isi,
 });
 
-class DetailCatatanPage extends StatelessWidget {
+class DetailCatatanPage extends StatefulWidget {
   final Catatan catatan;
   // Dapat diganti saat pengujian
+  final MuatDetailCatatan? muatDetail;
   final KirimBalasan? kirimBalasan;
 
-  const DetailCatatanPage({super.key, required this.catatan, this.kirimBalasan});
+  const DetailCatatanPage({
+    super.key,
+    required this.catatan,
+    this.muatDetail,
+    this.kirimBalasan,
+  });
+
+  @override
+  State<DetailCatatanPage> createState() => _DetailCatatanPageState();
+}
+
+class _DetailCatatanPageState extends State<DetailCatatanPage> {
+  late Catatan _catatan;
+
+  @override
+  void initState() {
+    super.initState();
+    _catatan = widget.catatan;
+    _muatDetail();
+  }
+
+  /// Panggil GET /api/catatan/{id} agar data selalu terbaru sekaligus memicu
+  /// pembaruan status_dibaca -> 'dibaca' otomatis di backend bila dibuka penerima.
+  Future<void> _muatDetail({bool dariRefresh = false}) async {
+    final idCatatan = _catatan.idCatatan;
+    if (idCatatan == null || idCatatan <= 0) return;
+
+    final muat = widget.muatDetail ?? AppRepository.getDetailCatatan;
+    final res = await muat(idCatatan);
+    if (!mounted) return;
+
+    if (res.isSuccess && res.data != null) {
+      setState(() => _catatan = Catatan.fromModel(res.data!));
+    } else if (dariRefresh) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Gagal memuat ulang catatan. ${res.message}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+    }
+  }
 
   Future<void> _balasPesan(BuildContext context) async {
     final pesanBerhasil = await showModalBottomSheet<String>(
@@ -30,8 +76,8 @@ class DetailCatatanPage extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _SheetBalasPesan(
-        catatan: catatan,
-        kirimBalasan: kirimBalasan ?? AppRepository.replyCatatan,
+        catatan: _catatan,
+        kirimBalasan: widget.kirimBalasan ?? AppRepository.replyCatatan,
       ),
     );
 
@@ -49,11 +95,15 @@ class DetailCatatanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final catatan = _catatan;
     return Scaffold(
       appBar: const JudulAppBar(judul: 'Detail Catatan'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        children: [
+      body: RefreshIndicator(
+        onRefresh: () => _muatDetail(dariRefresh: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [
           // Penulis
           Container(
             decoration: kartuDecoration(),
@@ -181,6 +231,7 @@ class DetailCatatanPage extends StatelessWidget {
             onPressed: () => _balasPesan(context),
           ),
         ],
+      ),
       ),
     );
   }
