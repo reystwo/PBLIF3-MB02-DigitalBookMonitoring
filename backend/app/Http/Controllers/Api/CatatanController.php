@@ -92,18 +92,8 @@ class CatatanController extends Controller
         }
 
         // Proteksi Privasi SEC-02:
-        if ($user->role === 'orang_tua') {
-            $idOrangTua = $user->orangTua?->id_orang_tua;
-            $isAnakKandung = $catatan->siswa?->orangTua()
-                ->where('orang_tua.id_orang_tua', $idOrangTua)
-                ->exists();
-
-            if (! $isAnakKandung) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Akses ditolak. Anda tidak berhak melihat catatan siswa ini.',
-                ], 403);
-            }
+        if ($this->orangTuaTidakBerhak($user, $catatan)) {
+            return $this->ditolak('Akses ditolak. Anda tidak berhak melihat catatan siswa ini.');
         }
 
         if ($this->guruTidakBerhak($user, $catatan)) {
@@ -226,18 +216,8 @@ class CatatanController extends Controller
         }
 
         // Proteksi Privasi SEC-02:
-        if ($user->role === 'orang_tua') {
-            $idOrangTua = $user->orangTua?->id_orang_tua;
-            $isAnakKandung = $catatanAsal->siswa?->orangTua()
-                ->where('orang_tua.id_orang_tua', $idOrangTua)
-                ->exists();
-
-            if (! $isAnakKandung) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Akses ditolak. Anda tidak berhak membalas catatan siswa ini.',
-                ], 403);
-            }
+        if ($this->orangTuaTidakBerhak($user, $catatanAsal)) {
+            return $this->ditolak('Akses ditolak. Anda tidak berhak membalas catatan siswa ini.');
         }
 
         if ($this->guruTidakBerhak($user, $catatanAsal)) {
@@ -297,7 +277,8 @@ class CatatanController extends Controller
      */
     public function markAsRead(Request $request, int|string $id): JsonResponse
     {
-        $catatan = CatatanPenghubung::find($id);
+        $user = $request->user();
+        $catatan = CatatanPenghubung::with('siswa')->find($id);
 
         if (! $catatan) {
             return response()->json([
@@ -306,7 +287,12 @@ class CatatanController extends Controller
             ], 404);
         }
 
-        if ($this->guruTidakBerhak($request->user(), $catatan)) {
+        // Proteksi Privasi SEC-02:
+        if ($this->orangTuaTidakBerhak($user, $catatan)) {
+            return $this->ditolak('Akses ditolak. Anda tidak berhak mengubah catatan siswa ini.');
+        }
+
+        if ($this->guruTidakBerhak($user, $catatan)) {
             return $this->ditolak('Akses ditolak. Anda tidak berhak mengubah catatan ini.');
         }
 
@@ -320,6 +306,25 @@ class CatatanController extends Controller
                 'status_dibaca' => 'dibaca',
             ],
         ], 200);
+    }
+
+    /**
+     * True bila user adalah Orang Tua dan siswa pada catatan bukan anak tertautnya (SEC-02).
+     */
+    private function orangTuaTidakBerhak(User $user, CatatanPenghubung $catatan): bool
+    {
+        if ($user->role !== 'orang_tua') {
+            return false;
+        }
+
+        $idOrangTua = $user->orangTua?->id_orang_tua;
+        if (! $idOrangTua) {
+            return true;
+        }
+
+        return ! $catatan->siswa?->orangTua()
+            ->where('orang_tua.id_orang_tua', $idOrangTua)
+            ->exists();
     }
 
     /**

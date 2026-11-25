@@ -275,4 +275,38 @@ class CatatanDanSiswaApiTest extends TestCase
                 ],
             ]);
     }
+
+    /**
+     * Test 10: SEC-02 - Orang Tua DITOLAK saat menandai dibaca catatan anak orang lain (HTTP 403),
+     * tetapi diperbolehkan menandai catatan anaknya sendiri.
+     */
+    public function test_sec_02_orang_tua_cannot_mark_other_children_notes_as_read(): void
+    {
+        $siswaSiti = Siswa::where('nama', 'Siti Aisyah')->firstOrFail();
+        $catatanSiti = CatatanPenghubung::where('id_siswa', $siswaSiti->id_siswa)
+            ->where('status_dibaca', 'belum_dibaca')
+            ->firstOrFail();
+
+        // Ibu Siti Nurhaliza (ortu Ahmad Rizki) mencoba menandai dibaca catatan Siti Aisyah -> 403
+        $this->withHeader('Authorization', 'Bearer ' . $this->ortuAhmadToken)
+            ->patchJson("/api/catatan/{$catatanSiti->id_catatan}/baca")
+            ->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+            ]);
+
+        // Status di database tidak boleh berubah
+        $this->assertEquals('belum_dibaca', $catatanSiti->fresh()->status_dibaca);
+
+        // Reset guard cache sebelum berganti token pengguna di dalam test yang sama
+        $this->app['auth']->forgetGuards();
+
+        // Ibu Fatimah (ortu Siti Aisyah yang sah) berhasil menandai dibaca -> 200
+        $this->withHeader('Authorization', 'Bearer ' . $this->ortuSitiToken)
+            ->patchJson("/api/catatan/{$catatanSiti->id_catatan}/baca")
+            ->assertStatus(200)
+            ->assertJsonPath('data.status_dibaca', 'dibaca');
+
+        $this->assertEquals('dibaca', $catatanSiti->fresh()->status_dibaca);
+    }
 }
