@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\OrangTuaController as AdminOrangTuaController
 use App\Http\Controllers\Api\Admin\SiswaController as AdminSiswaController;
 use App\Http\Controllers\Api\Guru\CatatanSiswaController as GuruCatatanSiswaController;
 use App\Http\Controllers\Api\Guru\SiswaController as GuruSiswaController;
+use App\Http\Controllers\Api\OrangTua\AnakController as OrangTuaAnakController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatatanController;
 use App\Http\Controllers\Api\DashboardController;
@@ -67,6 +68,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('siswa')->name('siswa.catatan.index')->missing($siswaTidakDitemukan);
         Route::post('siswa/{siswa}/catatan', [GuruCatatanSiswaController::class, 'store'])
             ->whereNumber('siswa')->name('siswa.catatan.store')->missing($siswaTidakDitemukan);
+    });
+
+    // Anak (siswa) yang ditautkan pada akun Orang Tua / Wali yang sedang login
+    Route::middleware('role:orang_tua')->prefix('orang-tua')->name('orang_tua.')->group(function () {
+        Route::get('anak', [OrangTuaAnakController::class, 'index'])->name('anak.index');
     });
 
     // Kelola Data (khusus Admin) - seluruh operasi baca/tambah/ubah/hapus
