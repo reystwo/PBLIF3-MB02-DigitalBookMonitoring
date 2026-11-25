@@ -309,4 +309,40 @@ class CatatanDanSiswaApiTest extends TestCase
 
         $this->assertEquals('dibaca', $catatanSiti->fresh()->status_dibaca);
     }
+
+    /**
+     * Test 11: Jika Orang Tua membalas pesan balasannya sendiri, penerima tetap mengarah
+     * ke wali kelas (Guru), bukan ke dirinya sendiri, dan status_dibaca pesan asal tidak ikut berubah.
+     */
+    public function test_orang_tua_replying_to_own_message_routes_to_wali_kelas_not_self(): void
+    {
+        $siswaAhmad = Siswa::where('nama', 'Ahmad Rizki')->firstOrFail();
+
+        // Buat pesan balasan milik Ibu Siti (ortu Ahmad Rizki) yang belum dibaca guru
+        $pesanSendiri = CatatanPenghubung::create([
+            'id_siswa' => $siswaAhmad->id_siswa,
+            'id_pengirim' => $this->ortuAhmad->id_user,
+            'id_penerima' => $this->guru->id_user,
+            'kategori' => 'Akademik',
+            'tanggal' => now(),
+            'isi_catatan' => 'Pesan pertama dari orang tua.',
+            'status_dibaca' => 'belum_dibaca',
+        ]);
+
+        // Orang tua mengirim pesan lanjutan dari pesan miliknya sendiri
+        $res = $this->withHeader('Authorization', 'Bearer ' . $this->ortuAhmadToken)
+            ->postJson("/api/catatan/{$pesanSendiri->id_catatan}/balas", [
+                'isi_catatan' => 'Tambahan informasi untuk Pak Guru.',
+            ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.id_pengirim', $this->ortuAhmad->id_user)
+            ->assertJsonPath('data.id_penerima', $this->guru->id_user);
+
+        // Pastikan tidak terkirim ke diri sendiri
+        $this->assertNotEquals($this->ortuAhmad->id_user, $res->json('data.id_penerima'));
+        // Status baca pesan pertama tetap belum_dibaca (karena belum dibaca oleh guru)
+        $this->assertEquals('belum_dibaca', $pesanSendiri->fresh()->status_dibaca);
+    }
 }

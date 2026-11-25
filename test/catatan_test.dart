@@ -10,10 +10,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:digital_book_connect/data/dummy_data.dart';
 import 'package:digital_book_connect/models/catatan_model.dart';
 import 'package:digital_book_connect/models/siswa_model.dart';
+import 'package:digital_book_connect/models/user_model.dart';
 import 'package:digital_book_connect/screens/catatan/detail_catatan_page.dart';
 import 'package:digital_book_connect/screens/catatan/riwayat_catatan_page.dart';
 import 'package:digital_book_connect/screens/notifikasi/notifikasi_page.dart';
 import 'package:digital_book_connect/services/api_service.dart';
+import 'package:digital_book_connect/services/session_manager.dart';
 
 /// Layar catatan & notifikasi hanya menampilkan data dari server,
 /// tidak pernah jatuh kembali ke data dummy (mis. setelah catatan dihapus Admin).
@@ -287,6 +289,51 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(dipanggil, isFalse);
+    });
+
+    testWidgets('membuka pesan milik sendiri menampilkan tombol Tulis Pesan Lanjutan', (tester) async {
+      addTearDown(SessionManager.clearSession);
+      await SessionManager.saveSession(
+        token: 'dummy-token',
+        user: const UserModel(
+          idUser: 15,
+          nama: 'Bapak Andi Saputra',
+          username: 'ortu_andi',
+          role: 'orang_tua',
+          status: 'aktif',
+          peranLabel: 'Orang Tua',
+        ),
+      );
+
+      final pesanSendiri = Catatan(
+        idCatatan: 20,
+        idPengirim: 15,
+        penulis: 'Bapak Andi Saputra',
+        peranPenulis: 'Orang Tua',
+        siswa: const Siswa(idSiswa: 9, nama: 'Rafa Aditya Saputra', kelas: '7A'),
+        kategori: 'Akademik',
+        tanggal: DateTime(2026, 11, 25),
+        isi: 'Terima kasih Pak Guru.',
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: pesanSendiri,
+          muatDetail: (_) async => const ApiResponse(success: false, message: 'skip', statusCode: 200),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tulis Pesan Lanjutan'), findsOneWidget);
+      expect(find.text('Balas Pesan'), findsNothing);
+
+      final tombol = find.text('Tulis Pesan Lanjutan');
+      await tester.ensureVisible(tombol);
+      await tester.tap(tombol);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pesan lanjutan untuk Rafa Aditya Saputra'), findsOneWidget);
+      expect(find.text('Balas ke Bapak Andi Saputra'), findsNothing);
     });
   });
 }

@@ -8,6 +8,7 @@ import 'package:digital_book_connect/models/catatan_model.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
 import 'package:digital_book_connect/services/api_service.dart';
 import 'package:digital_book_connect/services/app_repository.dart';
+import 'package:digital_book_connect/services/session_manager.dart';
 
 typedef MuatDetailCatatan = Future<ApiResponse<CatatanModel>> Function(int idCatatan);
 
@@ -35,13 +36,25 @@ class DetailCatatanPage extends StatefulWidget {
 
 class _DetailCatatanPageState extends State<DetailCatatanPage> {
   late Catatan _catatan;
+  int? _idUserLogin;
 
   @override
   void initState() {
     super.initState();
     _catatan = widget.catatan;
+    _muatUserLogin();
     _muatDetail();
   }
+
+  Future<void> _muatUserLogin() async {
+    final user = await SessionManager.getUser();
+    if (user != null && mounted) {
+      setState(() => _idUserLogin = user.idUser);
+    }
+  }
+
+  bool get _pesanSendiri =>
+      _idUserLogin != null && _catatan.idPengirim != null && _catatan.idPengirim == _idUserLogin;
 
   /// Panggil GET /api/catatan/{id} agar data selalu terbaru sekaligus memicu
   /// pembaruan status_dibaca -> 'dibaca' otomatis di backend bila dibuka penerima.
@@ -77,6 +90,7 @@ class _DetailCatatanPageState extends State<DetailCatatanPage> {
       ),
       builder: (_) => _SheetBalasPesan(
         catatan: _catatan,
+        pesanSendiri: _pesanSendiri,
         kirimBalasan: widget.kirimBalasan ?? AppRepository.replyCatatan,
       ),
     );
@@ -225,8 +239,8 @@ class _DetailCatatanPageState extends State<DetailCatatanPage> {
           const SizedBox(height: 28),
 
           TombolUtama(
-            label: 'Balas Pesan',
-            icon: Icons.reply_rounded,
+            label: _pesanSendiri ? 'Tulis Pesan Lanjutan' : 'Balas Pesan',
+            icon: _pesanSendiri ? Icons.add_comment_rounded : Icons.reply_rounded,
             stadium: true,
             onPressed: () => _balasPesan(context),
           ),
@@ -257,10 +271,12 @@ class _Judul extends StatelessWidget {
 
 class _SheetBalasPesan extends StatefulWidget {
   final Catatan catatan;
+  final bool pesanSendiri;
   final KirimBalasan kirimBalasan;
 
   const _SheetBalasPesan({
     required this.catatan,
+    required this.pesanSendiri,
     required this.kirimBalasan,
   });
 
@@ -339,7 +355,9 @@ class _SheetBalasPesanState extends State<_SheetBalasPesan> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Balas ke ${widget.catatan.penulis}',
+            widget.pesanSendiri
+                ? 'Pesan lanjutan untuk ${widget.catatan.siswa.nama}'
+                : 'Balas ke ${widget.catatan.penulis}',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,

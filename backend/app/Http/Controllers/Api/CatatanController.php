@@ -206,7 +206,7 @@ class CatatanController extends Controller
     public function reply(Request $request, int|string $id): JsonResponse
     {
         $user = $request->user();
-        $catatanAsal = CatatanPenghubung::with('siswa.orangTua.user')->find($id);
+        $catatanAsal = CatatanPenghubung::with(['siswa.orangTua.user', 'siswa.kelas.waliGuru', 'pengirim', 'penerima'])->find($id);
 
         if (! $catatanAsal) {
             return response()->json([
@@ -237,18 +237,34 @@ class CatatanController extends Controller
             ], 422);
         }
 
-        // Tentukan id_penerima balasan
+        // Tentukan id_penerima balasan agar pesan tidak pernah terkirim ke diri sendiri
         if ($user->role === 'orang_tua') {
-            // Orang tua membalas ke pengirim asal (Guru/Admin)
-            $idPenerima = $catatanAsal->id_pengirim;
+            $pengirimAsalBukanOrtu = $catatanAsal->pengirim && $catatanAsal->pengirim->role !== 'orang_tua';
+            if ((int) $catatanAsal->id_pengirim !== (int) $user->id_user && $pengirimAsalBukanOrtu) {
+                // Orang tua membalas catatan dari Guru / Admin
+                $idPenerima = $catatanAsal->id_pengirim;
+            } else {
+                // Orang tua menindaklanjuti pesannya sendiri (atau sesama orang tua):
+                // arahkan ke wali kelas siswa, atau penerima asal bila bukan orang tua
+                $idWaliKelas = $catatanAsal->siswa?->kelas?->waliGuru?->id_user;
+                $penerimaAsalBukanOrtu = $catatanAsal->penerima && $catatanAsal->penerima->role !== 'orang_tua';
+                $idPenerima = $idWaliKelas
+                    ?? ($penerimaAsalBukanOrtu ? $catatanAsal->id_penerima : $catatanAsal->id_pengirim);
+            }
         } else {
-            // Guru membalas ke akun orang tua siswa
-            $ortu = $catatanAsal->siswa?->orangTua->first();
-            $idPenerima = $ortu?->id_user ?? $catatanAsal->id_penerima;
+            // Guru / Admin membalas: prioritaskan pengirim asal bila orang tua, selain itu orang tua pertama siswa
+            if ($catatanAsal->pengirim?->role === 'orang_tua') {
+                $idPenerima = $catatanAsal->id_pengirim;
+            } else {
+                $ortu = $catatanAsal->siswa?->orangTua->first();
+                $idPenerima = $ortu?->id_user ?? $catatanAsal->id_penerima;
+            }
         }
 
-        // Tandai catatan asal sebagai sudah dibaca
-        $catatanAsal->update(['status_dibaca' => 'dibaca']);
+        // Tandai catatan asal sebagai sudah dibaca hanya jika dibalas oleh pihak lain (bukan pengirim sendiri)
+        if ((int) $catatanAsal->id_pengirim !== (int) $user->id_user) {
+            $catatanAsal->update(['status_dibaca' => 'dibaca']);
+        }
 
         // Buat record balasan di catatan_penghubung
         $balasan = CatatanPenghubung::create([

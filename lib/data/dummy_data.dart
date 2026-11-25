@@ -62,6 +62,7 @@ class Lampiran {
 
 class Catatan {
   final int? idCatatan;
+  final int? idPengirim;
   final String penulis;
   final String peranPenulis; // contoh: "Guru Kelas 7A" / "Orang Tua"
   final bool penulisPerempuan;
@@ -73,6 +74,7 @@ class Catatan {
 
   const Catatan({
     this.idCatatan,
+    this.idPengirim,
     required this.penulis,
     required this.peranPenulis,
     required this.siswa,
@@ -86,6 +88,7 @@ class Catatan {
   factory Catatan.fromModel(CatatanModel model) {
     return Catatan(
       idCatatan: model.idCatatan,
+      idPengirim: model.idPengirim,
       penulis: model.penulis,
       peranPenulis: model.peranPenulis,
       penulisPerempuan: model.penulisPerempuan,
