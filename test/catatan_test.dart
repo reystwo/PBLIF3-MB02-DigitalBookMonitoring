@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,8 +8,12 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:digital_book_connect/data/dummy_data.dart';
+import 'package:digital_book_connect/models/catatan_model.dart';
+import 'package:digital_book_connect/models/siswa_model.dart';
+import 'package:digital_book_connect/screens/catatan/detail_catatan_page.dart';
 import 'package:digital_book_connect/screens/catatan/riwayat_catatan_page.dart';
 import 'package:digital_book_connect/screens/notifikasi/notifikasi_page.dart';
+import 'package:digital_book_connect/services/api_service.dart';
 
 /// Layar catatan & notifikasi hanya menampilkan data dari server,
 /// tidak pernah jatuh kembali ke data dummy (mis. setelah catatan dihapus Admin).
@@ -47,5 +52,165 @@ void main() {
       expect(find.text('Belum ada notifikasi'), findsOneWidget);
       expect(find.text(aktivitasTerbaru.first.nama), findsNothing);
     }, () => server(200, {'success': true, 'message': 'OK', 'data': []}));
+  });
+
+  group('Balas Pesan di DetailCatatanPage', () {
+    Catatan buatCatatan({int? idCatatan = 10}) => Catatan(
+          idCatatan: idCatatan,
+          penulis: 'Bapak Ahmad',
+          peranPenulis: 'Guru Kelas 7A',
+          siswa: const Siswa(idSiswa: 9, nama: 'Rafa Aditya Saputra', kelas: '7A'),
+          kategori: 'Akademik',
+          tanggal: DateTime(2026, 11, 25),
+          isi: 'Ananda Rafa sangat aktif hari ini.',
+        );
+
+    CatatanModel buatBalasanModel(String isi) => CatatanModel(
+          idCatatan: 11,
+          idSiswa: 9,
+          idPengirim: 15,
+          idPenerima: 14,
+          penulis: 'Bapak Andi Saputra',
+          peranPenulis: 'Orang Tua',
+          kategori: 'Akademik',
+          isi: isi,
+          tanggal: DateTime(2026, 11, 25),
+          tanggalLabel: '25 Nov 2026',
+          siswa: const SiswaModel(
+            idSiswa: 9,
+            nis: '1001',
+            nama: 'Rafa Aditya Saputra',
+            jenisKelamin: 'L',
+            perempuan: false,
+            idKelas: 1,
+            kelas: '7A',
+          ),
+        );
+
+    Future<void> bukaSheetBalas(WidgetTester tester) async {
+      final tombolBalas = find.text('Balas Pesan');
+      await tester.ensureVisible(tombolBalas);
+      await tester.tap(tombolBalas);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('balasan gagal -> sheet tetap terbuka, input dipertahankan, tidak muncul pesan berhasil', (tester) async {
+      var panggilan = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(),
+          kirimBalasan: ({required idCatatan, required isi}) async {
+            panggilan++;
+            if (panggilan == 1) {
+              return const ApiResponse(
+                success: false,
+                message: 'Tidak dapat terhubung ke server.',
+                statusCode: 0,
+              );
+            }
+            return ApiResponse(
+              success: true,
+              message: 'Balasan berhasil dikirim',
+              data: buatBalasanModel(isi),
+              statusCode: 201,
+            );
+          },
+        ),
+      ));
+
+      await bukaSheetBalas(tester);
+      await tester.enterText(find.byKey(const Key('input-balasan')), 'Terima kasih Pak Guru');
+      await tester.tap(find.text('Kirim'));
+      await tester.pumpAndSettle();
+
+      // Sheet tetap terbuka, teks tetap ada, pesan gagal tampil, pesan berhasil tidak tampil
+      expect(panggilan, 1);
+      expect(find.byKey(const Key('input-balasan')), findsOneWidget);
+      expect(find.text('Terima kasih Pak Guru'), findsOneWidget);
+      expect(find.byKey(const Key('pesan-gagal-balasan')), findsOneWidget);
+      expect(find.textContaining('Balasan gagal dikirim. Tidak dapat terhubung ke server.'), findsOneWidget);
+      expect(find.text('Balasan berhasil dikirim'), findsNothing);
+
+      // Coba kirim ulang -> berhasil, sheet tertutup dan SnackBar sukses muncul
+      await tester.tap(find.text('Kirim'));
+      await tester.pumpAndSettle();
+
+      expect(panggilan, 2);
+      expect(find.byKey(const Key('input-balasan')), findsNothing);
+      expect(find.text('Balasan berhasil dikirim'), findsOneWidget);
+    });
+
+    testWidgets('menampilkan status Mengirim... saat request berjalan lalu menutup sheet saat sukses', (tester) async {
+      final completer = Completer<ApiResponse<CatatanModel>>();
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(),
+          kirimBalasan: ({required idCatatan, required isi}) => completer.future,
+        ),
+      ));
+
+      await bukaSheetBalas(tester);
+      await tester.enterText(find.byKey(const Key('input-balasan')), 'Baik Pak, akan kami dampingi');
+      await tester.tap(find.text('Kirim'));
+      await tester.pump();
+
+      expect(find.text('Mengirim...'), findsOneWidget);
+      expect(find.text('Balasan berhasil dikirim'), findsNothing);
+
+      completer.complete(ApiResponse(
+        success: true,
+        message: 'Balasan berhasil dikirim',
+        data: buatBalasanModel('Baik Pak, akan kami dampingi'),
+        statusCode: 201,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('input-balasan')), findsNothing);
+      expect(find.text('Balasan berhasil dikirim'), findsOneWidget);
+    });
+
+    testWidgets('input kosong atau hanya spasi menampilkan validasi tanpa memanggil server', (tester) async {
+      var dipanggil = false;
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(),
+          kirimBalasan: ({required idCatatan, required isi}) async {
+            dipanggil = true;
+            return ApiResponse(success: true, message: 'OK', data: buatBalasanModel(isi), statusCode: 201);
+          },
+        ),
+      ));
+
+      await bukaSheetBalas(tester);
+      await tester.enterText(find.byKey(const Key('input-balasan')), '   ');
+      await tester.tap(find.text('Kirim'));
+      await tester.pumpAndSettle();
+
+      expect(dipanggil, isFalse);
+      expect(find.text('Isi balasan tidak boleh kosong.'), findsOneWidget);
+      expect(find.byKey(const Key('input-balasan')), findsOneWidget);
+    });
+
+    testWidgets('idCatatan tidak valid menampilkan error tanpa mengklaim berhasil', (tester) async {
+      var dipanggil = false;
+      await tester.pumpWidget(MaterialApp(
+        home: DetailCatatanPage(
+          catatan: buatCatatan(idCatatan: null),
+          kirimBalasan: ({required idCatatan, required isi}) async {
+            dipanggil = true;
+            return ApiResponse(success: true, message: 'OK', data: buatBalasanModel(isi), statusCode: 201);
+          },
+        ),
+      ));
+
+      await bukaSheetBalas(tester);
+      await tester.enterText(find.byKey(const Key('input-balasan')), 'Halo Pak');
+      await tester.tap(find.text('Kirim'));
+      await tester.pumpAndSettle();
+
+      expect(dipanggil, isFalse);
+      expect(find.textContaining('Data catatan tidak valid'), findsOneWidget);
+      expect(find.text('Balasan berhasil dikirim'), findsNothing);
+    });
   });
 }

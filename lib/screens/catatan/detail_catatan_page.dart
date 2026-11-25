@@ -4,86 +4,47 @@
 import 'package:flutter/material.dart';
 import 'package:digital_book_connect/main.dart';
 import 'package:digital_book_connect/data/dummy_data.dart';
+import 'package:digital_book_connect/models/catatan_model.dart';
 import 'package:digital_book_connect/widgets/app_widgets.dart';
+import 'package:digital_book_connect/services/api_service.dart';
 import 'package:digital_book_connect/services/app_repository.dart';
+
+typedef KirimBalasan = Future<ApiResponse<CatatanModel>> Function({
+  required int idCatatan,
+  required String isi,
+});
 
 class DetailCatatanPage extends StatelessWidget {
   final Catatan catatan;
+  // Dapat diganti saat pengujian
+  final KirimBalasan? kirimBalasan;
 
-  const DetailCatatanPage({super.key, required this.catatan});
+  const DetailCatatanPage({super.key, required this.catatan, this.kirimBalasan});
 
-  void _balasPesan(BuildContext context) {
-    final controller = TextEditingController();
-    showModalBottomSheet(
+  Future<void> _balasPesan(BuildContext context) async {
+    final pesanBerhasil = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Balas ke ${catatan.penulis}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: 'Tulis balasan...',
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TombolUtama(
-              label: 'Kirim',
-              icon: Icons.send_rounded,
-              stadium: true,
-              onPressed: () async {
-                final isiBalasan = controller.text.trim();
-                if (isiBalasan.isEmpty) return;
-
-                Navigator.of(sheetContext).pop();
-
-                if (catatan.idCatatan != null && catatan.idCatatan! > 0) {
-                  await AppRepository.replyCatatan(
-                    idCatatan: catatan.idCatatan!,
-                    isi: isiBalasan,
-                  );
-                }
-
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Balasan berhasil dikirim'),
-                      backgroundColor: AppColors.primary,
-                    ),
-                  );
-                }
-              },
-            ),
-          ],
-        ),
+      builder: (_) => _SheetBalasPesan(
+        catatan: catatan,
+        kirimBalasan: kirimBalasan ?? AppRepository.replyCatatan,
       ),
-    ).whenComplete(controller.dispose);
+    );
+
+    if (pesanBerhasil != null && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(pesanBerhasil),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+    }
   }
 
   @override
@@ -238,6 +199,161 @@ class _Judul extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w700,
         color: AppColors.textDark,
+      ),
+    );
+  }
+}
+
+class _SheetBalasPesan extends StatefulWidget {
+  final Catatan catatan;
+  final KirimBalasan kirimBalasan;
+
+  const _SheetBalasPesan({
+    required this.catatan,
+    required this.kirimBalasan,
+  });
+
+  @override
+  State<_SheetBalasPesan> createState() => _SheetBalasPesanState();
+}
+
+class _SheetBalasPesanState extends State<_SheetBalasPesan> {
+  final _controller = TextEditingController();
+  bool _mengirim = false;
+  String? _pesanValidasi;
+  String? _pesanGagal;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _kirim() async {
+    final isiBalasan = _controller.text.trim();
+    if (isiBalasan.isEmpty) {
+      setState(() {
+        _pesanValidasi = 'Isi balasan tidak boleh kosong.';
+        _pesanGagal = null;
+      });
+      return;
+    }
+
+    final idCatatan = widget.catatan.idCatatan;
+    if (idCatatan == null || idCatatan <= 0) {
+      setState(() {
+        _pesanValidasi = null;
+        _pesanGagal = 'Data catatan tidak valid. Muat ulang halaman lalu coba lagi.';
+      });
+      return;
+    }
+
+    setState(() {
+      _mengirim = true;
+      _pesanValidasi = null;
+      _pesanGagal = null;
+    });
+
+    final res = await widget.kirimBalasan(
+      idCatatan: idCatatan,
+      isi: isiBalasan,
+    );
+
+    if (!mounted) return;
+
+    if (res.isSuccess) {
+      final pesan = res.message.isNotEmpty ? res.message : 'Balasan berhasil dikirim';
+      Navigator.of(context).pop(pesan);
+    } else {
+      setState(() {
+        _mengirim = false;
+        _pesanGagal = res.message.isNotEmpty
+            ? 'Balasan gagal dikirim. ${res.message}'
+            : 'Balasan gagal dikirim. Silakan coba lagi.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Balas ke ${widget.catatan.penulis}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('input-balasan'),
+            controller: _controller,
+            autofocus: true,
+            enabled: !_mengirim,
+            maxLines: 4,
+            onChanged: (_) {
+              if (_pesanValidasi != null || _pesanGagal != null) {
+                setState(() {
+                  _pesanValidasi = null;
+                  _pesanGagal = null;
+                });
+              }
+            },
+            decoration: InputDecoration(
+              hintText: 'Tulis balasan...',
+              errorText: _pesanValidasi,
+              filled: true,
+              fillColor: AppColors.background,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+            ),
+          ),
+          if (_pesanGagal != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              key: const Key('pesan-gagal-balasan'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.error_outline_rounded, size: 18, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _pesanGagal!,
+                      style: TextStyle(fontSize: 12.5, color: Colors.red.shade800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          TombolUtama(
+            label: _mengirim ? 'Mengirim...' : 'Kirim',
+            icon: _mengirim ? null : Icons.send_rounded,
+            stadium: true,
+            onPressed: _mengirim ? null : _kirim,
+          ),
+        ],
       ),
     );
   }
